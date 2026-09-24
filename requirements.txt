@@ -1,0 +1,6 @@
+langgraph
+streamlit
+pydantic
+langchain-openai
+python-dotenv
+reportlab
