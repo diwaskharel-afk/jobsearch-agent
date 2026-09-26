@@ -3,10 +3,12 @@ from langgraph.graph import StateGraph, START, END
 from state import AgentState
 from nodes import (
     format_bullets_node,
-    gap_analysis_node,
     generate_cv_content_node,
     intake_profile_node,
+    match_profile_node,
     parse_jd_node,
+    recommend_gaps_node,
+    route_after_match,
 )
 
 
@@ -23,10 +25,13 @@ def build_profile_graph():
 def build_application_graph():
     graph = StateGraph(AgentState)
     graph.add_node("parse_jd", parse_jd_node)
-    graph.add_node("gap_analysis", gap_analysis_node)
+    graph.add_node("match_profile", match_profile_node)
     graph.add_node("generate_cv_content", generate_cv_content_node)
+    graph.add_node("recommend_gaps", recommend_gaps_node)
     graph.add_edge(START, "parse_jd")
-    graph.add_edge("parse_jd", "gap_analysis")
-    graph.add_edge("gap_analysis", "generate_cv_content")
+    graph.add_edge("parse_jd", "match_profile")
+    # Optional branch: the user picks a tailored CV or recommendations for their gaps.
+    graph.add_conditional_edges("match_profile", route_after_match, ["generate_cv_content", "recommend_gaps"])
     graph.add_edge("generate_cv_content", END)
+    graph.add_edge("recommend_gaps", END)
     return graph.compile()

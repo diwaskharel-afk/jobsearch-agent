@@ -1,4 +1,8 @@
-from model import GapAnalysis, StructuredJD, StructuredProfile
+from model import JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+
+
+def _section(heading: str, items: list[str]) -> list[str]:
+    return [f"\n{heading}:"] + [f"- {i}" for i in items] if items else []
 
 
 def format_jd(jd: StructuredJD) -> str:
@@ -7,57 +11,84 @@ def format_jd(jd: StructuredJD) -> str:
         lines.append(f"Company: {jd.company}")
     if jd.seniority:
         lines.append(f"Seniority: {jd.seniority}")
-    if jd.required_skills:
-        lines.append(f"Required skills: {', '.join(jd.required_skills)}")
-    if jd.preferred_skills:
-        lines.append(f"Preferred skills: {', '.join(jd.preferred_skills)}")
+    lines += _section("Required", jd.requirements)
+    lines += _section("Preferred", jd.preferred)
+    lines += _section("Responsibilities", jd.responsibilities)
     if jd.tech_stack:
-        lines.append(f"Tech stack: {', '.join(jd.tech_stack)}")
-    if jd.keywords:
-        lines.append(f"Keywords: {', '.join(jd.keywords)}")
-    if jd.responsibilities:
-        lines.append("Responsibilities:")
-        lines.extend(f"- {item}" for item in jd.responsibilities)
+        lines.append(f"\nTech stack: {', '.join(jd.tech_stack)}")
     return "\n".join(lines)
 
 
-def format_profile_for_gap_analysis(profile: StructuredProfile) -> str:
+def item_names(profile: StructuredProfile) -> dict[str, str]:
+    """id -> display name for every project, experience, certification and education entry."""
+    names = {p.id: p.name for p in profile.projects}
+    names |= {e.id: f"{e.title} at {e.organization}" for e in profile.experience}
+    names |= {c.id: c.name + (f" ({c.issuer})" if c.issuer else "") for c in profile.certifications}
+    names |= {e.id: e.course_name + (f" — {e.institution}" if e.institution else "") for e in profile.education}
+    return names
+
+
+def format_profile(profile: StructuredProfile) -> str:
     sections = []
+
+    for p in profile.projects:
+        lines = [f"[{p.id}] Project: {p.name}"]
+        if p.tech_stack:
+            lines.append(f"  Tech stack: {', '.join(p.tech_stack)}")
+        body = p.bullets or [t for t in (p.description, p.outcomes) if t and t.strip()]
+        lines += [f"  - {b}" for b in body]
+        sections.append("\n".join(lines))
+
+    for e in profile.experience:
+        header = f"[{e.id}] Experience: {e.title} at {e.organization}"
+        lines = [header + (f" ({e.duration})" if e.duration else "")]
+        if e.tech_stack:
+            lines.append(f"  Tech stack: {', '.join(e.tech_stack)}")
+        lines += [f"  - {b}" for b in (e.bullets or e.responsibilities)]
+        sections.append("\n".join(lines))
+
+    for edu in profile.education:
+        header = f"[{edu.id}] Course/Education: {edu.course_name}"
+        if edu.institution:
+            header += f" — {edu.institution}"
+        lines = [header]
+        if edu.description:
+            lines.append(f"  {edu.description}")
+        sections.append("\n".join(lines))
+
+    for c in profile.certifications:
+        header = f"[{c.id}] Certification: {c.name}"
+        if c.issuer:
+            header += f" ({c.issuer})"
+        sections.append(header)
 
     if profile.skills:
         sections.append(f"Skills: {', '.join(profile.skills)}")
-
-    for project in profile.projects:
-        lines = [f"Project: {project.name}"]
-        if project.tech_stack:
-            lines.append(f"Tech stack: {', '.join(project.tech_stack)}")
-        lines.extend(f"- {bullet}" for bullet in project.bullets)
-        sections.append("\n".join(lines))
-
-    for experience in profile.experience:
-        lines = [f"Experience: {experience.title} at {experience.organization}"]
-        if experience.tech_stack:
-            lines.append(f"Tech stack: {', '.join(experience.tech_stack)}")
-        lines.extend(f"- {bullet}" for bullet in experience.bullets)
-        sections.append("\n".join(lines))
+    if profile.languages:
+        sections.append(f"Languages: {', '.join(profile.languages)}")
 
     return "\n\n".join(sections)
 
 
-def format_gap_analysis(gap: GapAnalysis) -> str:
-    lines = []
-    if gap.matched_skills:
-        lines.append(f"Matched skills: {', '.join(gap.matched_skills)}")
-    if gap.missing_required_skills:
-        lines.append(f"Missing required skills: {', '.join(gap.missing_required_skills)}")
-    if gap.missing_preferred_skills:
-        lines.append(f"Missing preferred skills: {', '.join(gap.missing_preferred_skills)}")
-    if gap.relevant_projects:
-        lines.append(f"Relevant projects: {', '.join(gap.relevant_projects)}")
-    if gap.relevant_experience:
-        lines.append(f"Relevant experience: {', '.join(gap.relevant_experience)}")
-    if gap.low_relevance_projects:
-        lines.append(f"Low-relevance projects: {', '.join(gap.low_relevance_projects)}")
-    if gap.notes:
-        lines.append(f"Notes: {gap.notes}")
+def format_job_match(match: JobMatch) -> str:
+    lines = ["Profile items ranked by relevance:"]
+    lines += [f"- [{i.id}] {i.name}: {i.relevance} — {i.reason}" for i in match.items]
+    if match.relevant_skills:
+        lines.append(f"\nRelevant skills: {', '.join(match.relevant_skills)}")
+    if match.missing:
+        lines.append("\nNot in the profile — never claim these:")
+        lines += [f"- {m.requirement} ({m.importance})" for m in match.missing]
+    return "\n".join(lines)
+
+
+def gap_ids(match: JobMatch) -> dict[str, MissingRequirement]:
+    """gap_1, gap_2, ... -> missing requirement, in JobMatch order."""
+    return {f"gap_{n}": m for n, m in enumerate(match.missing, start=1)}
+
+
+def format_gaps(match: JobMatch) -> str:
+    lines = ["Profile items ranked by relevance:"]
+    lines += [f"- [{i.id}] {i.name}: {i.relevance} — {i.reason}" for i in match.items]
+    lines.append("\nMissing requirements:")
+    lines += [f"- [{gid}] {m.requirement} ({m.importance}) — {m.note}" for gid, m in gap_ids(match).items()]
     return "\n".join(lines)

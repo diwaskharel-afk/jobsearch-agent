@@ -9,6 +9,7 @@
   "skills": [],
   "projects": [
     {
+      "id": "proj_1",
       "name": "Agentic-Data-Analyst",
       "description": "Agentic Data Analyst\nAn agent that takes a raw CSV and a plain-English question, decides for itself whether the job is exploration, supervised prediction, or forecasting, then runs the right analysis in a live Python sandbox and hands back a self-contained HTML report \u2014 plots, metrics, and a verification pass included.\n\nThe problem\nThe first version of this project was a single 100-line script: one create_agent ReAct loop, one run_python tool against an E2B sandbox, one giant 5-phase system prompt, and print(result) as the only output. It worked, but:\n\nnothing survived the run except stdout and stray PNGs \u2014 the actual report lived inside a LangChain message object that got printed and discarded;\nevery tool call's full history was resent to the model on every turn, with no truncation, no state contract, no way to check \"did it actually compute what it claims\";\nthere was one run, on one dataset, that didn't even match the task it was given \u2014 no way to tell if a prompt change made things better or worse.\nWhy an agentic approach at all\nData analysis is a good fit for the code-execution agent pattern (the same idea behind Open Interpreter / ChatGPT's Code Interpreter): rather than asking an LLM to describe an analysis, give it a real Python kernel and let it write and run the code, read the actual output, and iterate. The interesting engineering problem isn't \"can the model write pandas code\" \u2014 it's boundaries and contracts: deciding what each step is allowed to see, what it's required to produce, and how you'd know if it's wrong.\n\nArchitecture\nThe five analysis phases are explicit LangGraph nodes instead of one prompt hoping the model moves through them in order. Task classification is a real conditional edge, not a suggestion buried in a system prompt.\n\n\nEach node (graph.py) runs its own small, phase-scoped agent (agent.py) \u2014 its own tiny message history (base rules + phase prompt + current state summary), not the whole run's transcript \u2014 against a shared, persistent E2B sandbox (sandbox.py). Every node reads/writes a single typed state object (schema.py: AnalysisState), which is what gets validated and dumped as outputs/<run_id>/state.json. Nothing in the final report is allowed to come from anywhere except that state.\n\nModule\tResponsibility\nconfig.py\tAll configuration (dataset path, model, run limits, keys) from env/CLI \u2014 nothing hardcoded\nschema.py\tPydantic AnalysisState, ModelResult, CostReport \u2014 the data contract every node writes into\nsandbox.py\tE2B lifecycle, run_python tool, plot + state.json pull-back\nagent.py\tBuilds the phase-scoped ReAct agent each node runs\ngraph.py\tThe LangGraph wiring above\nverifier.py\tSecond LLM pass: checks the report's numeric claims against AnalysisState\ncost.py\tPer-node token usage + wall-clock + sandbox-seconds\nreport.py\tAssembles one self-contained HTML file (report + embedded plots + metrics + verification + cost)\nmain.py\tCLI entrypoint / run_pipeline() used by both the CLI and the Streamlit app\nprompts/*.md\tOne prompt fragment per node, sharing base_rules.md\neval/\tBenchmark datasets + pass/fail harness (see below)\nVerification, not just generation\nAfter the report is written, verifier.py makes one extra no-tools LLM call: given the report text and the ground-truth models_tried/forecast/ eda_findings from state.json, it flags any numeric claim that doesn't trace back to real data. This is a soft LLM-as-judge check \u2014 cheap, and it catches the most common failure mode of report-writing agents (confidently restating a number that was never actually computed).\n\nCost/latency instrumentation\nEvery node's wall-clock time and token usage is tracked (cost.py) and shown in the final report and in eval output \u2014 so \"how much did this run cost\" is answered, not guessed.\n\nExample run\nAsk it to model insurance charges from datasets/insurance.csv. The run produces outputs/<run_id>/report.html \u2014 a single file with the markdown report, every plot the agent generated embedded as base64 (no external file refs, so it's shareable standalone), a metrics table, the verification section, and a cost breakdown.\n\nExample output\nA real run on datasets/insurance.csv (predict branch) produces plots like this one, generated and saved by the agent itself during EDA:\n\nClaim amount by smoker status\n\n...alongside a metrics table comparing every model tried:\n\nModel\tRMSE on Test Set\nMean Predictor (baseline)\t12830.81\nLinear Regression\t12356.45\nRandom Forest Regressor\t13933.33\n...and a verification section confirming every number in the report traces back to real computed results:\n\nVerification: OK \u2014 no discrepancies found.\nAll of this \u2014 the markdown report, embedded plots, metrics table, verification, and a per-node cost/latency breakdown \u2014 ships as one self-contained report.html file.\n\nEvaluation\neval/ is a tiny but real benchmark: three synthetic, deterministically generated datasets, one per pipeline branch (eval/make_datasets.py):\n\nDataset\tExpected branch\tWhat's checked\neda_survey.csv\teda\tcorrect classification, valid state.json\ninsurance_like.csv\tpredict (regression)\tclassification, valid state, best model beats the naive mean-predictor baseline\ndaily_sales.csv\tforecast (time series)\tclassification, valid state, best model beats a naive-forecast baseline on the backtest window\nRun it with:\n\npython -m eval.run_eval\nThis makes real OpenAI + E2B calls, and writes a pass/fail-per-case summary to eval/results.json \u2014 useful for checking a prompt or model change hasn't regressed task classification or model quality, instead of eyeballing one run.\n\nLimitations (by design, not bugs)\nForecasting on non-temporal data is out of scope \u2014 the classify node requires a time dimension before routing to model_forecast; a dataset without one is routed to eda or predict instead, and the report says so. (This is exactly the mismatch the original single-script version had: it was asked to forecast a non-temporal insurance dataset and just complied.)\nThe verifier checks numeric consistency, not statistical correctness \u2014 it won't catch a p-hacked correlation, only a hallucinated one.\nEach node's tool-call budget (RUN_LIMIT_PER_NODE, default 6) is a hard cap; a very messy dataset can exhaust it mid-phase.\nNo persistence/checkpointing across runs yet \u2014 each run is one-shot. A planner/executor split, cross-run memory, and an adversarial \"debate\" stage (second perspective agent + judge) are natural next steps once this is stable.\nRunning it\ncp .env.example .env   # fill in OPENAI_API_KEY and E2B_API_KEY\n\npip install -r requirements.txt\n\n# CLI\npython main.py --dataset datasets/insurance.csv \\\n  --question \"Predict insurance claim amount from age, bmi, smoker status, and region\"\n\n# Streamlit demo\nstreamlit run streamlit_app.py\n\n# Eval harness\npython -m eval.run_eval\n\n# Docker\ndocker build -t agentic-data-analyst .\ndocker run --env-file .env -p 8501:8501 agentic-data-analyst\nLicense\nMIT \u2014 see LICENSE.",
       "tech_stack": [
@@ -34,23 +35,24 @@
       "repo_url": "https://github.com/diwaskharel-afk/Agentic-Data-Analyst",
       "outcomes": "",
       "bullets": [
-        "Built LangGraph pipeline with five explicit analysis phase nodes (graph.py) using LangGraph and LangChain",
-        "Implemented phase-scoped ReAct agents (agent.py) using LangChain with tiny message histories per node",
-        "Designed conditional task-classification edge to route predict/eda/forecast decisions using graph.py and prompts/*.md",
-        "Implemented Pydantic AnalysisState schema (schema.py) for typed inter-node state persisted to outputs/<run_id>/state.json",
-        "Developed E2B sandbox lifecycle and run_python tool (sandbox.py) for live Python code execution and artifact pull-back",
-        "Enforced state-only reporting so final report content derives solely from schema state.json (report.py)",
-        "Implemented verifier.py LLM pass that compares report numeric claims to AnalysisState using the OpenAI API, no tools",
-        "Instrumented per-node token usage, wall-clock time, and sandbox-seconds in cost.py and surfaced costs in reports",
-        "Built report.py to assemble a self-contained HTML file with embedded base64 plots generated via Matplotlib and Seaborn",
-        "Implemented ML branches using pandas, NumPy, and scikit-learn for EDA, regression, and forecasting workflows",
-        "Added CLI and Streamlit entrypoints (main.py, streamlit_app.py) and environment config loading via config.py and python-dotenv",
-        "Created eval harness (eval/) with deterministic datasets and pass/fail runs using real OpenAI+E2B calls (eval/run_eval)",
-        "Packaged application with Dockerfile and provided .env.example for secure configuration and Docker run instructions",
-        "Implemented a hard per-node tool-call budget (RUN_LIMIT_PER_NODE) enforced during phase execution"
+        "Refactored single-script agent into LangGraph pipeline with five explicit nodes, using LangGraph and Python.",
+        "Implemented phase-scoped ReAct agents in agent.py with LangChain and OpenAI API, each with isolated message history.",
+        "Built E2B sandbox lifecycle and run_python tool in sandbox.py to execute agent-written Python code and retrieve plots/state.",
+        "Defined Pydantic AnalysisState, ModelResult, and CostReport schemas in schema.py and persisted to outputs/<run_id>/state.json.",
+        "Enforced state-only report content by requiring all report elements to originate from AnalysisState values.",
+        "Implemented verifier.py as a no-tools LLM check using OpenAI API to validate numeric claims against AnalysisState.",
+        "Instrumented per-node token usage, wall-clock, and sandbox-seconds in cost.py and surfaced costs in final report.",
+        "Assembled self-contained HTML report with embedded base64 plots, metrics, verification, and cost using report.py and HTML/CSS.",
+        "Added task-classification conditional edge in graph.py to route runs to eda, predict, or forecast branches.",
+        "Scoped prompts per phase in prompts/*.md and used base_rules.md to build constrained phase prompts.",
+        "Built CLI entrypoint main.py run_pipeline(), integrated with Streamlit app streamlit_app.py, reading config via python-dotenv.",
+        "Implemented eval harness in eval/ with eval/make_datasets.py and eval/run_eval that writes pass/fail summaries to eval/results.json.",
+        "Containerized application with Dockerfile and provided docker build/run instructions.",
+        "Enforced per-node tool-call budget (RUN_LIMIT_PER_NODE default 6) to cap E2B runs."
       ]
     },
     {
+      "id": "proj_2",
       "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
       "description": "Machine Vision Final Project\nIMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\nCourse\nMachine Vision\nHAMK \u2013 H\u00e4me University of Applied Sciences\n\nTeam Members\nDiwas Kharel\nBikash Basyal\nBiswash Pokhrel\n1. Project Overview\nThis project implements a vision-guided robotic pick-and-place system where a camera detects objects on a table and guides a Dobot MG400 robot to pick them and place them into a box.\n\nThe project integrates the building blocks developed during the Machine Vision course including:\n\nImage preprocessing\nImage segmentation\nCoordinate mapping\nObject detection\nColor and shape selection\nrobot arm pick and place\nThe system converts object locations detected in the camera image into robot workspace coordinates and performs automated pick-and-place operations.\n\n2. Project Goal\nThe goal of this project is to build a system capable of:\n\nCalibrating a real camera with the robot workspace\nDetecting objects and distingues its properties i.e color and shape from a camera image\nConverting pixel coordinates (u, v) to robot coordinates (X, Y)\nProviding two system modes:\nPlan Mode\nExecute Mode\nPlan Mode\nThe system detects objects and computes robot coordinates without moving the robot.\n\nExecute Mode\nThe system performs the full robot pick-and-place operation.\n\n3. System Architecture\nThe project is structured into modular components. IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n\nProject Structure\ncalibration/\nperception/\nutils/\noutput/\n\ncalibration.json\ndobot_api.py\ndobot_controller.py\napp_ui.py\nmain.py\ninputimage.jpy\n4. Calibration System\nThe calibration tool maps image coordinates to robot workspace coordinates.\n\nThe calibration process involves collecting at least four-eight corresponding points:\n\nPixel coordinates (u, v) : a click funtion to give pixel cordinate of each click\n\nclick.py\nRobot coordinates (X, Y) : using dobots studio and dobot arm\n\nUsing these correspondences, the system computes a homography matrix (H) that transforms coordinates from image space to robot workspace.\n\nThe calibration information is saved in a file:\n\ncalibration.json\n5.Image Detection And Preprocessing\na. Image Preprocessing\nConverts the image to HSV (for color detection) and grayscale (for segmentation). Otsu thresholding automatically binarizes the image, and morphological operations clean up noise and fill gaps.\n\nResult: A binary image \u2014 objects in white, background in black.\n\nb. Object Segmentation\nConnected Components Analysis labels each white region as a separate object. Small and oversized regions are filtered out, and each valid object's bounding box, center point, and mask are extracted.\n\nResult: A list of candidate objects with location and size.\n\nc. Shape Detection\nThe object's contour is extracted and two features are computed:\n\nCircularity \u2014 high value \u2192 Circle\nPolygon approximation \u2014 4 vertices \u2192 Square (aspect ratio \u2248 1) or Rectangle\nResult: Each object gets a shape label.\n\nd. Color Detection\nObject pixels are isolated using the mask, and the average Hue from the HSV image is mapped to a color: Red, Orange, Green, or Blue.\n\nResult: Each object gets a color label.\n\nExample\nAny and all object and color detetion\nalt text detects all the shapes with everyclor present python main.py detect --mode plan\n\nColor Detection\nColor Detection Result Blue BlueandCircle.jpg \u2014 Detects and highlights blue objects in the scene. python main.py detect --color blue --mode plan\n\nColor Detection Result Orange OrangeObjet.jpg \u2014 Detects and highlights orange objects in the scene. python main.py detect --color orange --mode plan\n\nShape Detection\nShape Detection Circle.jpg \u2014 Detects circular shapes python main.py detect --shape circle  --mode plan\n\nCombined filteration\nDetect Plan Mode BlueandCircle.jpg \u2014 Blue color filter for only square python main.py detect --shape Square --color Blue --mode plan\n\n6. Graphical User Interface (GUI)\nA graphical interface was implemented using Streamlit to allow an operator to interact with the system.\n\nThe GUI provides:\n\nLive or captured camera image\nMode selection (Plan / Execute)\nColor selection\nShape selection\nButtons for detection and robot execution\nThe interface also displays detected objects and computed robot coordinates.\n\nGUI Screenshot\nAll Shape and Colour Detection Blue Circle\n\nRunning the Project\nClone the repository\n\nRun GUI\n\nstreamlit run app_streamlit.py\n7. Discussion\nThis project demonstrates the integration of machine vision and robotics for automated object manipulation. The system successfully performs camera calibration, object detection (i.e., color and shape), coordinate transformation, and robotic pick-and-place operations.\n\nObservations\nThe system works reliably in detecting objects under moderate lighting conditions, though it has difficulty detecting very bright colors such as yellow and white.\nColor detection is moderately reliable; some colors may be confused when brightness, shine, or texture varies.\nshape detection testing was performed only on circles and squares, which gave 100% accurate results.\nPick-and-place operations succeed approximately 70\u201380% of the time. Failures are usually due to inaccuracies in detecting the true object center\u2014sometimes the center is detected toward the edges, causing positioning errors.\nThe GUI improves usability for operators.\nOur Expriene\nThe project required around 30\u201340 hours to complete. Most time was spent on color and shape detection, and robot movement\nSignificant effort was needed to fine-tune mean hue values for optimal color separation.\nRobot control and movement were also challenging, particularly in setting up pick-and-place points, rest points, and movement paths. Some unnecessary movements and emergency stops occurred and where fixed.\nAs we were new to developing GUI, that also became difficult part .\nPossible Improvements\nEnable a live camera feed for real-time operation.\nImprove robustness to lighting variations.\nImplement real-time object tracking.\nAdd support for picking and sorting multiple object types.\n. Repository\nProject Repository:\n\nhttps://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n\nAbout\n\nNo description, website, or topics provided.\nResources\nReadme\nActivity\nStars\n0 stars\nWatchers\n0 watching\nForks\n",
       "tech_stack": [
@@ -79,21 +81,23 @@
       "repo_url": "https://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
       "outcomes": "",
       "bullets": [
-        "Built camera-to-robot calibration using Python and OpenCV, computing homography from 4\u20138 matched points, saved to calibration.json.",
-        "Implemented pixel-to-robot coordinate transformation using homography and coordinate mapping in dobot_controller.py with Dobot API.",
-        "Implemented image preprocessing pipeline with OpenCV and NumPy: HSV conversion, grayscale, Otsu thresholding, morphological operations.",
-        "Implemented connected-components segmentation using OpenCV, filtering by size, extracting bounding boxes, centers, and binary masks.",
-        "Implemented contour-based shape detection using circularity and polygon approximation to label circles, squares, and rectangles.",
-        "Implemented color detection by averaging Hue within object masks in HSV space to map Red/Orange/Green/Blue.",
-        "Integrated detection outputs into Streamlit GUI (app_streamlit.py) for live/captured image display and selection controls.",
-        "Implemented Plan mode to compute robot coordinates without movement and Execute mode to perform pick-and-place.",
-        "Controlled Dobot MG400 pick-and-place sequences via Dobot API, defining pick/place points, rest positions, and movement paths.",
-        "Built click.py tool to collect pixel coordinates interactively for calibration point correspondences.",
-        "Managed project source, version control, and hosting on GitHub using Git and repository documentation.",
-        "Conducted testing and parameter tuning for hue thresholds and robot paths; documented 70\u201380% pick-and-place success."
+        "Implemented camera-to-robot calibration using homography (OpenCV), collecting correspondences via click.py and Dobot Studio, saved to calibration.json",
+        "Built image preprocessing pipeline with OpenCV and NumPy: HSV conversion, grayscale, Otsu thresholding, morphological operations",
+        "Implemented object segmentation using OpenCV connected components, filtering by size, extracting bounding boxes, centers, and masks",
+        "Developed shape detection with OpenCV contour extraction, circularity metrics and polygon approximation to label circles, squares, rectangles",
+        "Implemented color detection using HSV mean-hue (OpenCV/NumPy) on object masks to map Red, Orange, Green, Blue",
+        "Converted pixel coordinates (u,v) to robot workspace coordinates (X,Y) via homography and camera calibration for Dobot MG400",
+        "Integrated Dobot MG400 control using Dobot API and dobot_controller.py to execute automated pick-and-place sequences",
+        "Implemented Plan and Execute modes: Plan computes robot coordinates without motion; Execute performs full pick-and-place operations",
+        "Built Streamlit GUI (app_streamlit.py) to display live/captured images, mode/color/shape selection, and detection/execution controls",
+        "Added CLI detection via main.py enabling targeted color/shape filtering (e.g., python main.py detect --shape circle --mode plan)",
+        "Documented system performance and limitations: circle/square shape detection 100% accurate; pick-and-place success ~70\u201380%",
+        "Organized codebase and versioned with Git/GitHub across modular folders calibration/, perception/, utils/, output/",
+        "Tuned HSV mean-hue thresholds for color separation using OpenCV; project development required ~30\u201340 hours"
       ]
     },
     {
+      "id": "proj_3",
       "name": "PL 2020-21 Season - Advanced Analysis Suite",
       "description": "PL 2020-21 Season - Advanced Analysis Suite\n\ud83c\udfc6 Project Overview\nThis is a comprehensive, production-grade analysis of the English Premier League 2020-21 season data. The project features advanced statistical analysis, machine learning techniques, and sophisticated visualizations to extract meaningful insights about player and team performance. alt text\n\n\ud83d\udcca Features\n1. Player Performance Analysis (1_player_performance_analysis.py)\nTop Performers Analysis: Multi-metric evaluation of elite players\nEfficiency Analysis:\nActual vs Expected Goals (xG) analysis\nActual vs Expected Assists (xA) analysis\nPosition-based passing efficiency\nProductivity vs playing time correlation\nPositional Comparisons: Statistical comparison across FW, MF, DF positions\nYoung Talent Identification: Custom talent scoring algorithm for players \u226423\nalt text\n\n2. Club Performance Analysis (2_club_performance_analysis.py)\nAttacking Metrics:\nTotal goals and assists by club\nGoal efficiency (Actual/xG ratio)\nExpected vs actual performance\nSquad Composition:\nSquad size and average age\nPosition distribution\nNationality diversity index\nDiscipline Analysis: Yellow/red card patterns and discipline index\nClub Clustering: Hierarchical clustering to identify similar teams\n3. Statistical Analysis (3_statistical_analysis.py)\nCorrelation Analysis:\nHeatmaps showing relationships between 12+ metrics\nTop positive and negative correlations\nRegression Modeling:\nLinear regression for goal prediction\nMulti-feature models with R\u00b2 scoring\nFeature importance analysis\nDistribution Analysis:\nNormality testing (Shapiro-Wilk test)\nKDE plots with statistical parameters\nOutlier Detection: IQR-based outlier identification\nComparative Tests:\nANOVA for age group comparisons\nT-tests for positional differences\nalt text\n\n4. Advanced Visualizations (4_advanced_visualizations.py)\nRadar Charts: Multi-dimensional player comparisons\nBubble Charts: 4-dimensional performance visualization\nHeatmaps:\nClub vs Position performance matrices\nAge group vs performance\nDiscipline patterns\nScatter Matrices: Pairwise relationship exploration\nCircular Bar Plots: Radial rankings for top performers\nAdvanced Comparisons:\nLollipop charts\nDiverging bar charts\nViolin plots for distribution comparisons\nalt text alt text alt text\n\n\ud83d\uddc2\ufe0f Project Structure\nEPL_Analysis/\n\u2502\n\u251c\u2500\u2500 config.py                          # Configuration and utility functions\n\u251c\u2500\u2500 master_analysis.py                 # Main script to run all analyses\n\u251c\u2500\u2500 player_performance_analysis.py     # Player-focused analysis\n\u251c\u2500\u2500 club_performance_analysis.py       # Club/team-focused analysis\n\u251c\u2500\u2500 statistical_analysis.py            # Statistical methods and tests\n\u251c\u2500\u2500 advanced_visualizations.py         # Creative visualizations\n\u251c\u2500\u2500 requirements.txt                   # Python dependencies\n\u251c\u2500\u2500 README.md                          # This file\n\u2502\n\u251c\u2500\u2500 EPL_20_21.csv                      # Input data (place your file here)\n\u2502\n\u2514\u2500\u2500 outputs/                           # Generated visualizations\n    \u251c\u2500\u2500 player_top_performers_multimet.png\n    \u251c\u2500\u2500 player_efficiency_analysis.png\n    \u251c\u2500\u2500 positional_performance_comparison.png\n    \u251c\u2500\u2500 young_talent_analysis.png\n    \u251c\u2500\u2500 club_attacking_performance.png\n    \u251c\u2500\u2500 squad_composition_analysis.png\n    \u251c\u2500\u2500 club_discipline_analysis.png\n    \u251c\u2500\u2500 club_clustering_analysis.png\n    \u251c\u2500\u2500 correlation_analysis.png\n    \u251c\u2500\u2500 regression_analysis.png\n    \u251c\u2500\u2500 distribution_analysis.png\n    \u251c\u2500\u2500 outlier_analysis.png\n    \u251c\u2500\u2500 statistical_comparisons.png\n    \u251c\u2500\u2500 player_radar_charts.png\n    \u251c\u2500\u2500 bubble_chart_analysis.png\n    \u251c\u2500\u2500 heatmap_visualizations.png\n    \u251c\u2500\u2500 scatter_matrix_analysis.png\n    \u251c\u2500\u2500 circular_bar_plots.png\n    \u2514\u2500\u2500 advanced_comparison_plots.png\n\ud83d\ude80 Installation & Setup\nPrerequisites\nPython 3.8 or higher\npip package manager\nInstallation Steps\nClone or download this project\n\nInstall required packages:\n\npip install -r requirements.txt\nPlace your data file:\nEnsure EPL_20_21.csv is in the project root directory\nThe CSV should have the following columns:\nName, Club, Nationality, Position, Age, Matches, Starts, Mins\nGoals, Assists, Passes_Attempted, Perc_Passes_Completed\nPenalty_Goals, Penalty_Attempted, xG, xA\nYellow_Cards, Red_Cards\n\ud83d\udcd6 Usage\nOption 1: Run Complete Analysis Suite\npython master_analysis.py\nThis will execute all four analysis modules sequentially and generate all visualizations.\n\nOption 2: Run Individual Modules\n# Run only player performance analysis\npython master_analysis.py 1\n\n# Run only club performance analysis\npython master_analysis.py 2\n\n# Run only statistical analysis\npython master_analysis.py 3\n\n# Run only advanced visualizations\npython master_analysis.py 4\nOption 3: Run Specific Analysis Files Directly\npython player_performance_analysis.py\npython club_performance_analysis.py\npython statistical_analysis.py\npython advanced_visualizations.py\n\ud83d\udcc8 Key Metrics & Derived Features\nCustom Calculated Metrics:\nMinsPerMatch: Average minutes played per match\nGoalsPerMatch: Goal scoring rate\nAssistsPerMatch: Assist providing rate\nGoals+Assists: Total goal contributions\nG+A_Per90: Goal contributions per 90 minutes\nxG+xA: Total expected goal contributions\nGoalConversionRate: Goals per pass attempted (%)\nNonPenaltyGoals: Goals excluding penalties\nxG_Overperformance: Actual goals minus expected goals\nxA_Overperformance: Actual assists minus expected assists\nPenalty_Conversion: Penalty success rate (%)\nPassesPerMatch: Average passes per match\nCardsPerMatch: Disciplinary issues rate\nDisciplineScore: Weighted card score (Yellow + Red\u00d73)\nTalentScore: Composite talent metric for young players\n\ud83c\udfaf Analysis Highlights\nPlayer Insights:\nIdentifies top performers across 6+ different metrics\nCompares actual performance vs expected metrics (xG, xA)\nAnalyzes efficiency by position and age\nDiscovers hidden talent among young players (U23)\nDetects statistical outliers and exceptional performers\nClub Insights:\nBenchmarks attacking output across all 20 clubs\nEvaluates goal efficiency (over/underperformance vs xG)\nAnalyzes squad demographics and composition\nIdentifies discipline patterns\nGroups similar clubs using hierarchical clustering\nStatistical Insights:\nReveals strongest correlations between performance metrics\nBuilds predictive models for goals and assists\nTests normality of key distributions\nIdentifies significant differences between positions and age groups\nProvides statistical validation for observed patterns\n\ud83d\udcca Sample Outputs\nAll visualizations are saved as high-resolution PNG files (300 DPI) in the outputs/ directory:\n\nPlayer Performance: 4 comprehensive visualizations\nClub Analysis: 4 detailed comparison charts\nStatistical Analysis: 5 statistical visualizations\nAdvanced Viz: 6 creative and insightful plots\nTotal: 19 high-quality visualizations\n\n\ud83d\udd27 Customization\nModify Analysis Parameters:\nEdit config.py to customize:\n\nFigure sizes and DPI\nColor palettes\nMinimum playing time thresholds\nOutput directory location\nAdd New Metrics:\nIn config.py, modify the create_derived_features() method to add custom calculated metrics.\n\nAdjust Visualizations:\nEach analysis file is modular - you can comment out specific visualizations or modify parameters within each method.\n\n\ud83d\udcdd Data Requirements\nThe input CSV file should contain data for all EPL players from the 2020-21 season with these required columns:\n\nPlayer Information:\n\nName, Club, Nationality, Position, Age\nMatch Statistics:\n\nMatches, Starts, Mins (minutes played)\nPerformance Metrics:\n\nGoals, Assists, Passes_Attempted, Perc_Passes_Completed\nPenalty_Goals, Penalty_Attempted\nxG (expected goals), xA (expected assists)\nYellow_Cards, Red_Cards\n\ud83d\udc1b Troubleshooting\nCommon Issues:\nModuleNotFoundError: Ensure all dependencies are installed\n\npip install -r requirements.txt\nFileNotFoundError: Verify EPL_20_21.csv is in the correct location\n\nCheck the file path in config.py (DATA_PATH variable)\nMemory Issues: If running on limited RAM:\n\nRun individual modules instead of the complete suite\nReduce figure sizes in config.py\nImport Errors: Use Python 3.8+\n\npython --version\n\ud83c\udf93 Learning Resources\nThis project demonstrates:\n\nData cleaning and feature engineering\nStatistical analysis and hypothesis testing\nRegression modeling and prediction\nAdvanced data visualization techniques\nObject-oriented programming in data science\nModular code organization\n\ud83d\ude4f Acknowledgments\nData from EPL 2020-21 season\nBuilt with Python, Pandas, Matplotlib, Seaborn, Scikit-learn, and SciPy\nLast Updated: 2026-02-09 Version: 1.0.0\n\nFor questions or suggestions, feel free to open an issue or contribute to the project!",
       "tech_stack": [
@@ -125,26 +129,24 @@
       "repo_url": "https://github.com/diwaskharel-afk/football_analysis",
       "outcomes": "",
       "bullets": [
-        "Built multi-metric player evaluation pipeline using Python, Pandas, NumPy, Scikit-learn, and Matplotlib.",
-        "Implemented actual-vs-expected xG and xA analyses with Pandas, NumPy, Seaborn, and Matplotlib.",
-        "Implemented position-based passing efficiency using Passes_Attempted and Perc_Passes_Completed with Pandas and Seaborn.",
-        "Implemented productivity vs playing time correlation using Pandas, SciPy (correlation), and Seaborn scatterplots.",
-        "Built positional statistical comparisons (FW/MF/DF) using SciPy T-tests and ANOVA with Pandas.",
-        "Developed TalentScore algorithm for U23 player identification via Pandas feature engineering and custom scoring.",
-        "Aggregated club attacking metrics and goal-efficiency (Actual/xG) computations using Pandas and NumPy.",
-        "Analyzed squad composition (squad size, average age, position distribution) and nationality diversity using Pandas and Matplotlib.",
-        "Implemented discipline analysis and DisciplineScore using Yellow_Cards and Red_Cards with Pandas and Seaborn visualizations.",
-        "Performed hierarchical clustering of clubs using Scikit-learn and SciPy to group similar teams.",
-        "Performed correlation analysis with heatmaps and feature-importance using Seaborn, Matplotlib, and Scikit-learn.",
-        "Built linear regression and multi-feature predictive models for goals using Scikit-learn and reported R\u00b2 scores.",
-        "Conducted distribution analysis: Shapiro-Wilk normality tests, KDE plots, and IQR-based outlier detection using SciPy and Seaborn.",
-        "Created advanced visualizations (radar, bubble, circular bar, violin, lollipop) using Matplotlib and Seaborn, saved as PNGs.",
-        "Modularized analyses into separate scripts with master_analysis.py for selective execution and outputs in outputs/ directory."
+        "Built player_performance_analysis.py module using Python, Pandas, NumPy, Matplotlib, Seaborn for multi-metric top-performers evaluation",
+        "Implemented xG and xA efficiency analysis using Pandas and NumPy to compute Actual vs Expected metrics",
+        "Developed positional passing efficiency and productivity vs playing-time analyses with derived features in config.py",
+        "Created young-talent scoring algorithm for U23 players using Pandas and custom feature engineering functions",
+        "Built club_performance_analysis.py using Python, Pandas, Seaborn to compute goals, assists, and goal-efficiency (Actual/xG) metrics",
+        "Implemented squad composition analyses (squad size, average age, position distribution, nationality diversity) with Pandas",
+        "Analyzed club discipline using Yellow/Red cards and computed DisciplineScore using Pandas and NumPy",
+        "Applied hierarchical clustering for club grouping using SciPy/Scikit-learn and visualized clusters with Matplotlib/Seaborn",
+        "Implemented statistical_analysis.py to generate correlation heatmaps and identify top positive/negative correlations using Seaborn",
+        "Built regression models (linear and multi-feature) with Scikit-learn, reporting R\u00b2 and feature importance",
+        "Performed distribution tests (Shapiro-Wilk via SciPy), KDE plotting, IQR-based outlier detection, ANOVA and t-tests for comparative analysis",
+        "Created advanced_visualizations.py producing radar charts, bubble charts, heatmaps, scatter matrices, circular bar plots using Matplotlib and Seaborn"
       ]
     }
   ],
   "experience": [
     {
+      "id": "exp_1",
       "title": "LLM & NLP Recommendation Systems Intern",
       "organization": "RightProb Solutions ",
       "duration": "May 2025 \u2013 July 2025",
@@ -160,21 +162,18 @@
       ],
       "tech_stack": [],
       "bullets": [
-        "Built end-to-end bi-directional semantic matching engine pairing candidate profiles with job vacancies, covering data preparation, embedding, indexing, retrieval, recruiter-facing interface.",
-        "Engineered text representation layer consolidating fragmented profile and vacancy records into single normalized documents (title+description composition, type coercion, missing-value handling).",
-        "Selected intfloat/multilingual-e5-base (768-d) to match Finnish, English and mixed-language CVs and adverts.",
-        "Implemented cosine-similarity retrieval by L2-normalising all vectors into a FAISS IndexFlatIP index.",
-        "Built and persisted FAISS indexes covering 2,184 candidate profiles and 1,000 job postings for instant downstream queries.",
-        "Delivered bi-directional ranked retrieval returning candidate\u2192best-fit vacancies and vacancy\u2192best-fit candidates.",
-        "Reconstructed stored vectors directly from FAISS using reconstruct_n to serve queries without re-encoding.",
-        "Built interactive recruiter-facing CLI exposing scored top-k matches in both directions.",
-        "Used the CLI to qualitatively evaluate ranking quality and iterate on embedding model choice and text composition strategy.",
-        "Collected profile and vacancy datasets for the hiring platform prior to modelling.",
-        "Cleaned and deduplicated profile and vacancy records prior to modelling.",
-        "Performed exploratory analysis on profile and vacancy datasets to inform modelling decisions."
+        "Built an end-to-end bi-directional semantic matching engine using intfloat/multilingual-e5-base embeddings and FAISS",
+        "Engineered the text representation layer by consolidating fragmented records into normalized documents (title+description composition, type coercion, missing-value handling)",
+        "Selected intfloat/multilingual-e5-base (768-d) over English-only models to match Finnish, English and mixed-language CVs and job adverts",
+        "Implemented cosine-similarity retrieval by L2-normalising vectors and indexing with FAISS IndexFlatIP",
+        "Built and persisted FAISS indexes covering 2,184 candidate profiles and 1,000 job postings for instant querying without re-encoding",
+        "Delivered bi-directional ranked retrieval (candidate\u2192vacancies and vacancy\u2192candidates) by reconstructing stored vectors via FAISS reconstruct_n",
+        "Built an interactive recruiter-facing CLI exposing scored top-k matches in both directions for qualitative evaluation and iteration",
+        "Handled data collection, cleaning, deduplication and exploratory analysis of profile and vacancy datasets prior to modelling"
       ]
     },
     {
+      "id": "exp_2",
       "title": "AI Research & Industrial AI Assistant Intern",
       "organization": " Vaski Group Oy ",
       "duration": "April 2026 \u2013 June 2026",
@@ -191,19 +190,21 @@
       ],
       "tech_stack": [],
       "bullets": [
-        "Designed the VaskiPUNCH RAG chat assistant using official PDF manuals and training-video transcripts as sole sources",
-        "Built the ingestion pipeline: PDF text extraction, section-aware structural chunking, video transcription, chunking, indexed with source metadata",
+        "Designed and built the VaskiPUNCH RAG chat assistant answering operator and maintenance queries from PDFs and video transcripts",
+        "Built PDF text extraction and section-aware structural chunking pipeline, plus transcription and chunking of training videos, indexed with source metadata",
         "Implemented parallel dense semantic search (all-MiniLM-L6-v2) and BM25 keyword search merged into a top-20 candidate pool",
-        "Re-scored candidates with ms-marco-MiniLM-L-6-v2 cross-encoder into a top-10 shortlist and synthesized answers with GPT-4.1",
-        "Improved retrieval precision on terminology-heavy queries by combining semantic, BM25, and cross-encoder re-ranking",
-        "Enforced strict grounding: required source citations and explicit refusals when evidence absent for safety-circuit procedures",
-        "Added a guidance layer surfacing relevant training videos with direct links alongside procedural answers",
-        "Specified and validated fully on-premise deployment: CPU-only mini-PC, ~160 MB local models, browser access, air-gapped Ollama variant",
-        "Authored internal technical report and deployment guide covering architecture, hardware, installation automation, and local-vs-cloud trade-offs",
-        "Researched industrial AI opportunities (predictive maintenance, production monitoring, troubleshooting, factory optimisation) and assessed LLM/NLP feasibility on plant data"
+        "Rescored candidate passages with ms-marco-MiniLM-L-6-v2 cross-encoder into a top-10 shortlist and synthesized answers with GPT-4.1",
+        "Evaluated retrieval precision on terminology-heavy technical queries, confirming hybrid retrieval recovered exact part and alarm names",
+        "Enforced strict grounding as a hard safety requirement so every answer cites its source and system refuses without evidence",
+        "Added a guidance layer surfacing the relevant training video with a direct link alongside procedural answers",
+        "Specified and validated a fully on-premise deployment: CPU-only inference on a mini-PC, ~160 MB local models, browser access for tablets/laptops",
+        "Implemented an air-gapped variant replacing GPT-4.1 calls with a local Ollama model to eliminate cloud dependency",
+        "Authored the internal technical report and deployment guide covering architecture, hardware requirements, installation and startup automation",
+        "Researched industrial AI opportunities (predictive maintenance, production monitoring, agent-assisted troubleshooting, factory optimisation) and assessed feasibility with LLM/NLP on plant data"
       ]
     },
     {
+      "id": "exp_3",
       "title": "AI Tools & Text-to-Speech Intern",
       "organization": "Vaski Group Oy ",
       "duration": "\u00b7 November 2025 \u2013 February 2026",
@@ -214,14 +215,17 @@
       ],
       "tech_stack": [],
       "bullets": [
-        "Benchmarked commercial and open-source AI voice and text-to-speech engines for quality, cost, language coverage, and licensing.",
-        "Automated script-to-voice workflow for machine documentation videos, replacing manual narration with a repeatable pipeline.",
-        "Established reusable process producing consistent voice-over for technical training, validating output with documentation team editorial standards."
+        "Benchmarked commercial and open-source AI voice and text-to-speech engines against quality, cost, language coverage, licensing criteria for documentation team.",
+        "Automated the script-to-voice workflow for machine documentation videos using a repeatable pipeline replacing manual narration.",
+        "Removed re-recording costs of script revisions by replacing manual narration with an automated script-to-voice pipeline.",
+        "Established a reusable process for producing consistent voice-over for technical training material.",
+        "Collaborated directly with the documentation team to validate voice output quality against editorial standards."
       ]
     }
   ],
   "education": [
     {
+      "id": "edu_1",
       "course_name": "Bachelor of Engineering   ICT  Robotic and AI",
       "institution": "H\u00e4me University of Applied Sciences, HAMK",
       "description": "",
@@ -235,5 +239,11 @@
   "links": {
     "linkedin": "https://www.linkedin.com/in/diwas-kharel-a77626395/",
     "github": "https://github.com/diwaskharel-afk?tab=repositories"
+  },
+  "id_counters": {
+    "proj": 3,
+    "exp": 3,
+    "cert": 0,
+    "edu": 1
   }
 }
