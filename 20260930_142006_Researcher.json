@@ -1,0 +1,645 @@
+{
+  "saved_at": "2026-09-30T14:20:06",
+  "models": {
+    "bullets": "gpt-6-luna",
+    "parse_jd": "gpt-6-luna",
+    "match": "gpt-6-sol",
+    "cv": "gpt-6-sol",
+    "gaps": "gpt-6-sol"
+  },
+  "jd_input": "About the job\nWe are looking for a passionate and motivated researcher with a solid track record of solving challenging problems, advancing state-of-the-art, and demonstrated passion for ground-breaking research that could be scaled to production environment with an emphasis on the intersection of AI and Safety.\n\nYour responsibilities:· Create new techniques to make AI models more interpretable, unbiased, transparent and aligned with human values for real-world scenarios.· Create new techniques to ensure consistent alignment between user-centric explanations and intrinsic model behavior.· Reverse-engineer on neural networks to understand internal workings of AI models rather than treating them as \"black boxes\".· Develop data attribution methods to quantify the influence of specific data points (text and image) on a model's prediction and implement solution.· Implement and integrate AI explainbility techniques and tools.· Build rigorous benchmarks and datasets to measure the quality of explanations, model transparency, and effectiveness of treatments.· Communicate insights to stakeholders\n.\nRequirements:· Ph.D. in Computer Science, Deep Learning, Machine Learning, Mathematics or other related fields.· Focused on research in the AI field with good track records and high motivation in Explainable AI and Safety domain.· Strong proficiency in Large Language Models (LLMs), neural networks, and computer vision architectures.· Strong background in Python, Java, or C++, with deep knowledge of ML frameworks such as PyTorch, TensorFlow.· Successful experience in AI alignment to human values and expectations, model robustness improvement, controlled and continual learning, neural network interpretability and editing techniques is highly valued.· Pioneering novel methods and neural networks that revolutionized machine learning or the AI field, or revolutionized the industry, is a big bonus.· Strong publication record in top conferences (i.e. NeurIPS/ICLR/ICML/ AAAI/ACL/CVPR/ICCV/EMNLP/NAACL).· Candidates with ICPC, IOI/IMO, IOAI and other international competition in computer science, machine learning, and AI, etc. are highly preferred.· Good teamwork, enjoy working with multi‑culture teams, passionate in challenging the status qu\no.",
+  "structured_profile": {
+    "name": "Diwas Kharel",
+    "contact": {
+      "address": "Kaartokatu 2 , helsinki",
+      "phone": "0449241055",
+      "email": "diwaskharel73@gmail.com"
+    },
+    "skills": [],
+    "projects": [
+      {
+        "id": "proj_1",
+        "name": "Agentic-Data-Analyst",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/Agentic-Data-Analyst",
+        "readme": "# Agentic Data Analyst\n\nAn agent that takes a raw CSV and a plain-English question, decides for itself\nwhether the job is exploration, supervised prediction, or forecasting, then\nruns the right analysis in a live Python sandbox and hands back a\nself-contained HTML report — plots, metrics, and a verification pass included.\n\n## The problem\n\nThe first version of this project was a single 100-line script: one\n`create_agent` ReAct loop, one `run_python` tool against an E2B sandbox, one\ngiant 5-phase system prompt, and `print(result)` as the only output. It\nworked, but:\n- nothing survived the run except stdout and stray PNGs — the actual report\n  lived inside a LangChain message object that got printed and discarded;\n- every tool call's full history was resent to the model on every turn, with\n  no truncation, no state contract, no way to check \"did it actually compute\n  what it claims\";\n- there was one run, on one dataset, that didn't even match the task it was\n  given — no way to tell if a prompt change made things better or worse.\n\n## Why an agentic approach at all\n\nData analysis is a good fit for the **code-execution agent** pattern (the\nsame idea behind Open Interpreter / ChatGPT's Code Interpreter): rather than\nasking an LLM to *describe* an analysis, give it a real Python kernel and let\nit write and run the code, read the actual output, and iterate. The\ninteresting engineering problem isn't \"can the model write pandas code\" — it's\n**boundaries and contracts**: deciding what each step is allowed to see, what\nit's required to produce, and how you'd know if it's wrong.\n\n## Architecture\n\nThe five analysis phases are explicit LangGraph nodes instead of one prompt\nhoping the model moves through them in order. Task classification is a real\nconditional edge, not a suggestion buried in a system prompt.\n\n```mermaid\nflowchart TD\n    classify[classify: eda / predict / forecast?] --> ingest[ingest & validate]\n    ingest --> eda[exploratory analysis]\n    eda -->|eda only| report[write report]\n    eda -->|predict or forecast| feature_prep[feature prep]\n    feature_prep -->|predict| model_predict[train & evaluate models]\n    feature_prep -->|forecast| model_forecast[backtest & forecast]\n    model_predict --> report\n    model_forecast --> report\n    report --> verify[verify report vs. ground truth]\n    verify --> END\n```\n\nEach node (`graph.py`) runs its own small, phase-scoped agent (`agent.py`) —\nits own tiny message history (base rules + phase prompt + current state\nsummary), not the whole run's transcript — against a shared, persistent E2B\nsandbox (`sandbox.py`). Every node reads/writes a single typed state object\n(`schema.py: AnalysisState`), which is what gets validated and dumped as\n`outputs/<run_id>/state.json`. Nothing in the final report is allowed to come\nfrom anywhere except that state.\n\n| Module | Responsibility |\n|---|---|\n| `config.py` | All configuration (dataset path, model, run limits, keys) from env/CLI — nothing hardcoded |\n| `schema.py` | Pydantic `AnalysisState`, `ModelResult`, `CostReport` — the data contract every node writes into |\n| `sandbox.py` | E2B lifecycle, `run_python` tool, plot + `state.json` pull-back |\n| `agent.py` | Builds the phase-scoped ReAct agent each node runs |\n| `graph.py` | The LangGraph wiring above |\n| `verifier.py` | Second LLM pass: checks the report's numeric claims against `AnalysisState` |\n| `cost.py` | Per-node token usage + wall-clock + sandbox-seconds |\n| `report.py` | Assembles one self-contained HTML file (report + embedded plots + metrics + verification + cost) |\n| `main.py` | CLI entrypoint / `run_pipeline()` used by both the CLI and the Streamlit app |\n| `prompts/*.md` | One prompt fragment per node, sharing `base_rules.md` |\n| `eval/` | Benchmark datasets + pass/fail harness (see below) |\n\n### Verification, not just generation\n\nAfter the report is written, `verifier.py` makes one extra no-tools LLM call:\ngiven the report text and the ground-truth `models_tried`/`forecast`/\n`eda_findings` from `state.json`, it flags any numeric claim that doesn't\ntrace back to real data. This is a soft **LLM-as-judge** check — cheap, and\nit catches the most common failure mode of report-writing agents\n(confidently restating a number that was never actually computed).\n\n### Cost/latency instrumentation\n\nEvery node's wall-clock time and token usage is tracked (`cost.py`) and shown\nin the final report and in eval output — so \"how much did this run cost\" is\nanswered, not guessed.\n\n## Example run\n\nAsk it to model insurance charges from `datasets/insurance.csv`. The run\nproduces `outputs/<run_id>/report.html` — a single file with the markdown\nreport, every plot the agent generated embedded as base64 (no external file\nrefs, so it's shareable standalone), a metrics table, the verification\nsection, and a cost breakdown.\n\n## Example output\n\nA real run on `datasets/insurance.csv` (`predict` branch) produces plots like\nthis one, generated and saved by the agent itself during EDA:\n\n...alongside a metrics table comparing every model tried:\n\n| Model                    | RMSE on Test Set |\n|---------------------------|------------------|\n| Mean Predictor (baseline) | 12830.81         |\n| Linear Regression         | 12356.45         |\n| Random Forest Regressor   | 13933.33         |\n\n...and a verification section confirming every number in the report traces\nback to real computed results:\n\n```\nVerification: OK — no discrepancies found.\n```\n\nAll of this — the markdown report, embedded plots, metrics table,\nverification, and a per-node cost/latency breakdown — ships as one\nself-contained `report.html` file.\n\n## Evaluation\n\n`eval/` is a tiny but real benchmark: three synthetic, deterministically\ngenerated datasets, one per pipeline branch (`eval/make_datasets.py`):\n\n| Dataset | Expected branch | What's checked |\n|---|---|---|\n| `eda_survey.csv` | `eda` | correct classification, valid `state.json` |\n| `insurance_like.csv` | `predict` (regression) | classification, valid state, best model beats the naive mean-predictor baseline |\n| `daily_sales.csv` | `forecast` (time series) | classification, valid state, best model beats a naive-forecast baseline on the backtest window |\n\nRun it with:\n\n```bash\npython -m eval.run_eval\n```\n\nThis makes real OpenAI + E2B calls, and writes a pass/fail-per-case summary to\n`eval/results.json` — useful for checking a prompt or model change hasn't\nregressed task classification or model quality, instead of eyeballing one run.\n\n## Limitations (by design, not bugs)\n\n- **Forecasting on non-temporal data is out of scope** — the `classify` node\n  requires a time dimension before routing to `model_forecast`; a dataset\n  without one is routed to `eda` or `predict` instead, and the report says so.\n  (This is exactly the mismatch the original single-script version had: it\n  was asked to forecast a non-temporal insurance dataset and just complied.)\n- The verifier checks *numeric consistency*, not *statistical correctness* —\n  it won't catch a p-hacked correlation, only a hallucinated one.\n- Each node's tool-call budget (`RUN_LIMIT_PER_NODE`, default 6) is a hard\n  cap; a very messy dataset can exhaust it mid-phase.\n- No persistence/checkpointing across runs yet — each run is one-shot. A\n  planner/executor split, cross-run memory, and an adversarial \"debate\" stage\n  (second perspective agent + judge) are natural next steps once this is\n  stable.\n\n## Running it\n\n```bash\ncp .env.example .env   # fill in OPENAI_API_KEY and E2B_API_KEY\n\npip install -r requirements.txt\n\n# CLI\npython main.py --dataset datasets/insurance.csv \\\n  --question \"Predict insurance claim amount from age, bmi, smoker status, and region\"\n\n# Streamlit demo\nstreamlit run streamlit_app.py\n\n# Eval harness\npython -m eval.run_eval\n\n# Docker\ndocker build -t agentic-data-analyst .\ndocker run --env-file .env -p 8501:8501 agentic-data-analyst\n```\n\n## License\n\nMIT — see [LICENSE](LICENSE).",
+        "bullets": [
+          "Designed a LangGraph pipeline with conditional routing for exploratory analysis, supervised prediction, and time-series forecasting.",
+          "Built phase-scoped LangChain ReAct agents that use a shared persistent E2B Python sandbox to execute and iterate on analyses.",
+          "Defined typed Pydantic AnalysisState, ModelResult, and CostReport schemas as validated data contracts across pipeline nodes.",
+          "Implemented dataset ingestion and validation, exploratory analysis, feature preparation, model evaluation, and forecasting phases.",
+          "Created a report verifier that checks numeric claims against ground-truth analysis state using a separate LLM pass.",
+          "Generated self-contained HTML reports with embedded plots, metrics tables, verification results, and per-node cost breakdowns.",
+          "Instrumented token usage, wall-clock time, and sandbox duration for each analysis phase.",
+          "Built a benchmark harness with three synthetic datasets to test branch classification, state validity, and model performance against baselines.",
+          "Added a CLI and Streamlit interface that invoke the shared Python run_pipeline entry point.",
+          "Packaged the application for Docker deployment and configured dataset paths, models, run limits, and keys through environment variables and CLI options."
+        ]
+      },
+      {
+        "id": "proj_2",
+        "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "readme": "# Machine Vision Final Project\n## IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n\n### Course\nMachine Vision\nHAMK – Häme University of Applied Sciences\n\n### Team Members\n- Diwas Kharel\n- Bikash Basyal\n- Biswash Pokhrel\n\n---\n\n# 1. Project Overview\n\nThis project implements a **vision-guided robotic pick-and-place system** where a camera detects objects on a table and guides a **Dobot MG400 robot** to pick them and place them into a box.\n\nThe project integrates the building blocks developed during the Machine Vision course including:\n\n- Image preprocessing\n- Image segmentation\n- Coordinate mapping\n- Object detection\n- Color and shape selection\n- robot arm pick and place\n\nThe system converts object locations detected in the camera image into **robot workspace coordinates** and performs automated pick-and-place operations.\n\n---\n\n# 2. Project Goal\n\nThe goal of this project is to build a system capable of:\n\n- Calibrating a real camera with the robot workspace\n- Detecting objects and distingues its properties i.e color and shape from a camera image\n- Converting pixel coordinates (u, v) to robot coordinates (X, Y)\n- Providing two system modes:\n  - **Plan Mode**\n  - **Execute Mode**\n\n### Plan Mode\nThe system detects objects and computes robot coordinates without moving the robot.\n\n### Execute Mode\nThe system performs the full robot pick-and-place operation.\n\n---\n\n# 3. System Architecture\n\nThe project is structured into modular components.\nIMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n### Project Structure\n\n```\ncalibration/\nperception/\nutils/\noutput/\n\ncalibration.json\ndobot_api.py\ndobot_controller.py\napp_ui.py\nmain.py\ninputimage.jpy\n```\n\n---\n\n# 4. Calibration System\n\nThe calibration tool maps image coordinates to robot workspace coordinates.\n\nThe calibration process involves collecting at least **four-eight corresponding points**:\n\nPixel coordinates (u, v) : a click funtion to give pixel cordinate of each click\n\n```\nclick.py\n```\n\nRobot coordinates\n(X, Y) : using dobots studio and dobot arm\n\nUsing these correspondences, the system computes a **homography matrix (H)** that transforms coordinates from image space to robot workspace.\n\nThe calibration information is saved in a file:\n```\ncalibration.json\n```\n\n---\n# 5.Image Detection And Preprocessing\n\n## a. Image Preprocessing\n\nConverts the image to **HSV** (for color detection) and **grayscale** (for segmentation). **Otsu thresholding** automatically binarizes the image, and **morphological operations** clean up noise and fill gaps.\n\n**Result:** A binary image — objects in **white**, background in **black**.\n\n---\n\n## b. Object Segmentation\n\n**Connected Components Analysis** labels each white region as a separate object. Small and oversized regions are filtered out, and each valid object's **bounding box**, **center point**, and **mask** are extracted.\n\n**Result:** A list of candidate objects with location and size.\n\n---\n\n## c. Shape Detection\n\nThe object's **contour** is extracted and two features are computed:\n\n- **Circularity** — high value → **Circle**\n- **Polygon approximation** — 4 vertices → **Square** (aspect ratio ≈ 1) or **Rectangle**\n\n**Result:** Each object gets a **shape label**.\n\n---\n\n## d. Color Detection\n\nObject pixels are isolated using the **mask**, and the average **Hue** from the HSV image is mapped to a color: **Red, Orange, Green, or Blue**.\n\n**Result:** Each object gets a **color label**.\n\n---\n## Example\n### Any and all object and color detetion\n\ndetects all the shapes with everyclor present\n`python main.py detect --mode plan`\n### Color Detection\n\n**BlueandCircle.jpg** — Detects and highlights blue objects in the scene.\n`python main.py detect --color blue --mode plan`\n\n**OrangeObjet.jpg** — Detects and highlights orange objects in the scene.\n`python main.py detect --color orange --mode plan`\n\n---\n\n### Shape Detection\n\n**Circle.jpg** — Detects circular shapes\n`python main.py detect --shape circle  --mode plan`\n\n### Combined filteration\n\n**BlueandCircle.jpg** — Blue color filter for only square\n`python main.py detect --shape Square --color Blue --mode plan`\n\n# 6. Graphical User Interface (GUI)\n\nA graphical interface was implemented using **Streamlit** to allow an operator to interact with the system.\n\nThe GUI provides:\n\n- Live or captured camera image\n- Mode selection (Plan / Execute)\n- Color selection\n- Shape selection\n- Buttons for detection and robot execution\n\nThe interface also displays detected objects and computed robot coordinates.\n\n### GUI Screenshot\n\n---\n\n### Running the Project\n\nClone the repository\n\nRun GUI\n```\nstreamlit run app_streamlit.py\n```\n\n---\n\n# 7. Discussion\n\nThis project demonstrates the integration of machine vision and robotics for automated object manipulation. The system successfully performs camera calibration, object detection (i.e., color and shape), coordinate transformation, and robotic pick-and-place operations.\n\n### Observations\n\n- The system works reliably in detecting objects under moderate lighting conditions, though it has difficulty detecting very bright colors such as yellow and white.\n- Color detection is moderately reliable; some colors may be confused when brightness, shine, or texture varies.\n- shape detection testing was performed only on circles and squares, which gave 100% accurate results.\n- Pick-and-place operations succeed approximately 70–80% of the time. Failures are usually due to inaccuracies in detecting the true object center—sometimes the center is detected toward the edges, causing positioning errors.\n- The GUI improves usability for operators.\n### Our Expriene\n- The project required around 30–40 hours to complete. Most time was spent on color and shape detection, and robot movement\n- Significant effort was needed to fine-tune mean hue values for optimal color separation.\n- Robot control and movement were also challenging, particularly in setting up pick-and-place points, rest points, and movement paths. Some unnecessary movements and emergency stops occurred and where fixed.\n- As we were new to developing GUI, that also became difficult part .\n\n### Possible Improvements\n\n- Enable a live camera feed for real-time operation.\n- Improve robustness to lighting variations.\n- Implement real-time object tracking.\n- Add support for picking and sorting multiple object types.\n\n---\n\n# . Repository\n\nProject Repository:\n\nhttps://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "bullets": [
+          "Built a vision-guided pick-and-place system integrating camera-based object detection with the Dobot MG400 robot.",
+          "Calibrated camera and robot workspace using corresponding pixel and robot coordinates to compute a homography transform.",
+          "Implemented image preprocessing with HSV and grayscale conversion, Otsu thresholding, and morphological cleanup.",
+          "Segmented objects using connected components, filtering regions and extracting bounding boxes, centers, and masks.",
+          "Detected circles, squares, and rectangles using contour circularity, polygon approximation, and aspect ratios.",
+          "Classified red, orange, green, and blue objects by mapping masked pixels’ average HSV hue.",
+          "Mapped detected object pixel coordinates to robot workspace coordinates for pick-and-place operations.",
+          "Implemented Plan and Execute modes for coordinate planning and automated robot pick-and-place operations.",
+          "Built a Streamlit interface for camera images, mode and object filters, detection, robot execution, and coordinate display."
+        ]
+      },
+      {
+        "id": "proj_3",
+        "name": "PL 2020-21 Season - Advanced Analysis Suite",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/football_analysis",
+        "readme": "# EPL 2020-21 Season - Advanced Analysis Suite\n\n## 🏆 Project Overview\n\nThis is a comprehensive, production-grade analysis of the English Premier League 2020-21 season data. The project features advanced statistical analysis, machine learning techniques, and sophisticated visualizations to extract meaningful insights about player and team performance.\n\n## 📊 Features\n\n### 1. Player Performance Analysis (`1_player_performance_analysis.py`)\n- **Top Performers Analysis**: Multi-metric evaluation of elite players\n- **Efficiency Analysis**:\n  - Actual vs Expected Goals (xG) analysis\n  - Actual vs Expected Assists (xA) analysis\n  - Position-based passing efficiency\n  - Productivity vs playing time correlation\n- **Positional Comparisons**: Statistical comparison across FW, MF, DF positions\n- **Young Talent Identification**: Custom talent scoring algorithm for players ≤23\n\n### 2. Club Performance Analysis (`2_club_performance_analysis.py`)\n- **Attacking Metrics**:\n  - Total goals and assists by club\n  - Goal efficiency (Actual/xG ratio)\n  - Expected vs actual performance\n- **Squad Composition**:\n  - Squad size and average age\n  - Position distribution\n  - Nationality diversity index\n- **Discipline Analysis**: Yellow/red card patterns and discipline index\n- **Club Clustering**: Hierarchical clustering to identify similar teams\n\n### 3. Statistical Analysis (`3_statistical_analysis.py`)\n- **Correlation Analysis**:\n  - Heatmaps showing relationships between 12+ metrics\n  - Top positive and negative correlations\n- **Regression Modeling**:\n  - Linear regression for goal prediction\n  - Multi-feature models with R² scoring\n  - Feature importance analysis\n- **Distribution Analysis**:\n  - Normality testing (Shapiro-Wilk test)\n  - KDE plots with statistical parameters\n- **Outlier Detection**: IQR-based outlier identification\n- **Comparative Tests**:\n  - ANOVA for age group comparisons\n  - T-tests for positional differences\n\n### 4. Advanced Visualizations (`4_advanced_visualizations.py`)\n- **Radar Charts**: Multi-dimensional player comparisons\n- **Bubble Charts**: 4-dimensional performance visualization\n- **Heatmaps**:\n  - Club vs Position performance matrices\n  - Age group vs performance\n  - Discipline patterns\n- **Scatter Matrices**: Pairwise relationship exploration\n- **Circular Bar Plots**: Radial rankings for top performers\n- **Advanced Comparisons**:\n  - Lollipop charts\n  - Diverging bar charts\n  - Violin plots for distribution comparisons\n\n## 🗂️ Project Structure\n\n```\nEPL_Analysis/\n│\n├── config.py                          # Configuration and utility functions\n├── master_analysis.py                 # Main script to run all analyses\n├── player_performance_analysis.py     # Player-focused analysis\n├── club_performance_analysis.py       # Club/team-focused analysis\n├── statistical_analysis.py            # Statistical methods and tests\n├── advanced_visualizations.py         # Creative visualizations\n├── requirements.txt                   # Python dependencies\n├── README.md                          # This file\n│\n├── EPL_20_21.csv                      # Input data (place your file here)\n│\n└── outputs/                           # Generated visualizations\n    ├── player_top_performers_multimet.png\n    ├── player_efficiency_analysis.png\n    ├── positional_performance_comparison.png\n    ├── young_talent_analysis.png\n    ├── club_attacking_performance.png\n    ├── squad_composition_analysis.png\n    ├── club_discipline_analysis.png\n    ├── club_clustering_analysis.png\n    ├── correlation_analysis.png\n    ├── regression_analysis.png\n    ├── distribution_analysis.png\n    ├── outlier_analysis.png\n    ├── statistical_comparisons.png\n    ├── player_radar_charts.png\n    ├── bubble_chart_analysis.png\n    ├── heatmap_visualizations.png\n    ├── scatter_matrix_analysis.png\n    ├── circular_bar_plots.png\n    └── advanced_comparison_plots.png\n```\n\n## 🚀 Installation & Setup\n\n### Prerequisites\n- Python 3.8 or higher\n- pip package manager\n\n### Installation Steps\n\n1. **Clone or download this project**\n\n2. **Install required packages**:\n```bash\npip install -r requirements.txt\n```\n\n3. **Place your data file**:\n   - Ensure `EPL_20_21.csv` is in the project root directory\n   - The CSV should have the following columns:\n     - Name, Club, Nationality, Position, Age, Matches, Starts, Mins\n     - Goals, Assists, Passes_Attempted, Perc_Passes_Completed\n     - Penalty_Goals, Penalty_Attempted, xG, xA\n     - Yellow_Cards, Red_Cards\n\n## 📖 Usage\n\n### Option 1: Run Complete Analysis Suite\n```bash\npython master_analysis.py\n```\nThis will execute all four analysis modules sequentially and generate all visualizations.\n\n### Option 2: Run Individual Modules\n```bash\n# Run only player performance analysis\npython master_analysis.py 1\n\n# Run only club performance analysis\npython master_analysis.py 2\n\n# Run only statistical analysis\npython master_analysis.py 3\n\n# Run only advanced visualizations\npython master_analysis.py 4\n```\n\n### Option 3: Run Specific Analysis Files Directly\n```bash\npython player_performance_analysis.py\npython club_performance_analysis.py\npython statistical_analysis.py\npython advanced_visualizations.py\n```\n\n## 📈 Key Metrics & Derived Features\n\n### Custom Calculated Metrics:\n- **MinsPerMatch**: Average minutes played per match\n- **GoalsPerMatch**: Goal scoring rate\n- **AssistsPerMatch**: Assist providing rate\n- **Goals+Assists**: Total goal contributions\n- **G+A_Per90**: Goal contributions per 90 minutes\n- **xG+xA**: Total expected goal contributions\n- **GoalConversionRate**: Goals per pass attempted (%)\n- **NonPenaltyGoals**: Goals excluding penalties\n- **xG_Overperformance**: Actual goals minus expected goals\n- **xA_Overperformance**: Actual assists minus expected assists\n- **Penalty_Conversion**: Penalty success rate (%)\n- **PassesPerMatch**: Average passes per match\n- **CardsPerMatch**: Disciplinary issues rate\n- **DisciplineScore**: Weighted card score (Yellow + Red×3)\n- **TalentScore**: Composite talent metric for young players\n\n## 🎯 Analysis Highlights\n\n### Player Insights:\n- Identifies top performers across 6+ different metrics\n- Compares actual performance vs expected metrics (xG, xA)\n- Analyzes efficiency by position and age\n- Discovers hidden talent among young players (U23)\n- Detects statistical outliers and exceptional performers\n\n### Club Insights:\n- Benchmarks attacking output across all 20 clubs\n- Evaluates goal efficiency (over/underperformance vs xG)\n- Analyzes squad demographics and composition\n- Identifies discipline patterns\n- Groups similar clubs using hierarchical clustering\n\n### Statistical Insights:\n- Reveals strongest correlations between performance metrics\n- Builds predictive models for goals and assists\n- Tests normality of key distributions\n- Identifies significant differences between positions and age groups\n- Provides statistical validation for observed patterns\n\n## 📊 Sample Outputs\n\nAll visualizations are saved as high-resolution PNG files (300 DPI) in the `outputs/` directory:\n\n1. **Player Performance**: 4 comprehensive visualizations\n2. **Club Analysis**: 4 detailed comparison charts\n3. **Statistical Analysis**: 5 statistical visualizations\n4. **Advanced Viz**: 6 creative and insightful plots\n\n**Total: 19 high-quality visualizations**\n\n## 🔧 Customization\n\n### Modify Analysis Parameters:\n\nEdit `config.py` to customize:\n- Figure sizes and DPI\n- Color palettes\n- Minimum playing time thresholds\n- Output directory location\n\n### Add New Metrics:\n\nIn `config.py`, modify the `create_derived_features()` method to add custom calculated metrics.\n\n### Adjust Visualizations:\n\nEach analysis file is modular - you can comment out specific visualizations or modify parameters within each method.\n\n## 📝 Data Requirements\n\nThe input CSV file should contain data for all EPL players from the 2020-21 season with these required columns:\n\n**Player Information:**\n- Name, Club, Nationality, Position, Age\n\n**Match Statistics:**\n- Matches, Starts, Mins (minutes played)\n\n**Performance Metrics:**\n- Goals, Assists, Passes_Attempted, Perc_Passes_Completed\n- Penalty_Goals, Penalty_Attempted\n- xG (expected goals), xA (expected assists)\n- Yellow_Cards, Red_Cards\n\n## 🐛 Troubleshooting\n\n### Common Issues:\n\n1. **ModuleNotFoundError**: Ensure all dependencies are installed\n   ```bash\n   pip install -r requirements.txt\n   ```\n\n2. **FileNotFoundError**: Verify `EPL_20_21.csv` is in the correct location\n   - Check the file path in `config.py` (DATA_PATH variable)\n\n3. **Memory Issues**: If running on limited RAM:\n   - Run individual modules instead of the complete suite\n   - Reduce figure sizes in `config.py`\n\n4. **Import Errors**: Use Python 3.8+\n   ```bash\n   python --version\n   ```\n\n## 🎓 Learning Resources\n\nThis project demonstrates:\n- Data cleaning and feature engineering\n- Statistical analysis and hypothesis testing\n- Regression modeling and prediction\n- Advanced data visualization techniques\n- Object-oriented programming in data science\n- Modular code organization\n\n## 🙏 Acknowledgments\n\n- Data from EPL 2020-21 season\n- Built with Python, Pandas, Matplotlib, Seaborn, Scikit-learn, and SciPy\n\n---\n\n**Last Updated**: 2026-02-09\n**Version**: 1.0.0\n\nFor questions or suggestions, feel free to open an issue or contribute to the project!",
+        "bullets": [
+          "Built a modular Python analysis suite using Pandas, Matplotlib, Seaborn, Scikit-learn, and SciPy for EPL 2020–21 data.",
+          "Engineered player performance metrics, including per-90 contributions, xG/xA overperformance, penalty conversion, and weighted discipline scores.",
+          "Analyzed player efficiency, positional performance, age groups, and U23 talent using a custom composite scoring algorithm.",
+          "Compared club attacking output, squad composition, and discipline; applied hierarchical clustering to group similar teams.",
+          "Performed correlation, linear regression, feature importance, normality, outlier, ANOVA, and t-test analyses on performance metrics.",
+          "Created radar, bubble, heatmap, scatter-matrix, circular bar, violin, lollipop, and diverging bar visualizations.",
+          "Generated 19 visualizations as high-resolution PNGs and organized analyses into modules orchestrated by a master script."
+        ]
+      }
+    ],
+    "experience": [
+      {
+        "id": "exp_1",
+        "title": "LLM & NLP Recommendation Systems Intern",
+        "organization": "RightProb Solutions ",
+        "duration": "May 2025 – July 2025",
+        "responsibilities": [
+          "RightProb Solutions — Finland · May 2025 – July 2025",
+          "•\tBuilt an end-to-end bi-directional semantic matching engine pairing candidate profiles with job vacancies — the core recommendation component of the company's hiring platform — covering data preparation, embedding, indexing, retrieval and the recruiter-facing interface.",
+          "•\tEngineered the text representation layer: consolidated fragmented profile and vacancy records into single normalised documents (title + description composition, type coercion, missing-value handling) so one embedding captured the complete context of each entity.",
+          "•\tSelected intfloat/multilingual-e5-base (768-d) over English-only models so that Finnish, English and mixed-language CVs and job adverts could be matched inside a single shared vector space — a requirement the Finnish market makes unavoidable.",
+          "•\tImplemented cosine-similarity retrieval by L2-normalising all vectors into a FAISS IndexFlatIP index; built and persisted indexes covering 2,184 candidate profiles and 1,000 job postings so downstream services could query instantly without re-encoding the corpus.",
+          "•\tDelivered bi-directional ranked retrieval — candidate → best-fit vacancies and vacancy → best-fit candidates — reconstructing stored vectors directly from the FAISS index (reconstruct_n) so each internal query costs a single index lookup instead of a model forward pass.",
+          "•\tBuilt an interactive recruiter-facing CLI exposing scored top-k matches in both directions, used to qualitatively evaluate ranking quality and iterate on embedding model choice and text composition strategy.",
+          "•\tHandled the underlying data work throughout: collection, cleaning, deduplication and exploratory analysis of the profile and vacancy datasets prior to modelling."
+        ],
+        "bullets": [
+          "Built an end-to-end bidirectional semantic matching engine for candidate profiles and job vacancies, covering preparation, embedding, indexing, retrieval, and interface.",
+          "Consolidated fragmented candidate and vacancy records into normalized documents using title-description composition, type coercion, and missing-value handling.",
+          "Selected intfloat/multilingual-e5-base (768-dimensional) to match Finnish, English, and mixed-language profiles and vacancies in one vector space.",
+          "Implemented cosine-similarity retrieval with L2-normalized vectors and FAISS IndexFlatIP, indexing 2,184 profiles and 1,000 job postings.",
+          "Delivered ranked candidate-to-vacancy and vacancy-to-candidate retrieval, reconstructing stored vectors with FAISS reconstruct_n to avoid query-time model inference.",
+          "Built an interactive recruiter-facing CLI showing scored top-k matches in both directions to evaluate ranking quality and iterate on embeddings.",
+          "Collected, cleaned, deduplicated, and explored candidate profile and job vacancy datasets before modeling."
+        ]
+      },
+      {
+        "id": "exp_2",
+        "title": "AI Research & Industrial AI Assistant Intern",
+        "organization": " Vaski Group Oy ",
+        "duration": "April 2026 – June 2026",
+        "responsibilities": [
+          "Vaski Group Oy — Finland · April 2026 – June 2026",
+          "•\tDesigned, built and evaluated the VaskiPUNCH AI Assistant, a deployment-ready RAG chat system that answers operator and maintenance questions about an industrial punching machine using official PDF manuals and training-video transcripts as its only source of truth.",
+          "•\tBuilt the full ingestion pipeline: PDF text extraction, section-aware structural chunking, and transcription and chunking of training videos, indexed into a single searchable corpus with source metadata preserved so every answer remains traceable to its document or video.",
+          "•\tImplemented a three-stage hybrid retrieval architecture — parallel dense semantic search (all-MiniLM-L6-v2) and BM25 keyword search merged into a top-20 candidate pool, re-scored by a ms-marco-MiniLM-L-6-v2 cross-encoder into a top-10 shortlist, and synthesised by GPT-4.1 — substantially improving retrieval precision on terminology-heavy technical queries where pure semantic search alone missed exact part and alarm names.",
+          "•\tEnforced strict grounding as a hard safety requirement: every answer cites its source, and the system explicitly refuses when the evidence is absent rather than producing a plausible guess — critical when the output describes safety-circuit and machine-reset procedures.",
+          "•\tAdded a guidance layer that surfaces the relevant training video with a direct link alongside procedural answers, connecting written documentation to existing video training material.",
+          "•\tSpecified and validated a fully on-premise deployment: CPU-only inference on a mini-PC mounted at the machine, ~160 MB of local models, browser access for any tablet or laptop on the plant network with zero operator-side installation, and an air-gapped variant that swaps the GPT-4.1 call for a local Ollama model — removing the cloud dependency entirely and keeping proprietary manuals on-site.",
+          "•\tAuthored the internal technical report and deployment guide — architecture, hardware requirements, installation and startup automation, local-vs-cloud trade-offs — used by stakeholders to assess rollout across machines.",
+          "•\tResearched broader industrial AI opportunities (predictive maintenance, production monitoring, agent-assisted troubleshooting, factory optimisation) and assessed which were realistically achievable with LLM/NLP methods on the company's existing plant data."
+        ],
+        "bullets": [
+          "Built VaskiPUNCH AI Assistant, a deployment-ready RAG system answering industrial-machine operator and maintenance questions from official manuals and training-video transcripts.",
+          "Developed an ingestion pipeline with PDF extraction, section-aware chunking, video transcription, and source metadata preserved in a searchable corpus.",
+          "Implemented hybrid retrieval with all-MiniLM-L6-v2 semantic search, BM25, and ms-marco-MiniLM-L-6-v2 reranking before GPT-4.1 synthesis.",
+          "Enforced source citations and evidence-based refusals, preventing unsupported answers about safety circuits and machine-reset procedures.",
+          "Added a guidance layer linking relevant training videos alongside procedural answers.",
+          "Specified and validated CPU-only, on-premise deployment on a machine-mounted mini-PC, with browser access over the plant network.",
+          "Designed an air-gapped deployment variant replacing GPT-4.1 with a local Ollama model to keep proprietary manuals on-site.",
+          "Authored an internal technical report and deployment guide covering architecture, hardware, installation, startup automation, and local-versus-cloud trade-offs.",
+          "Researched predictive maintenance, production monitoring, agent-assisted troubleshooting, and factory optimisation opportunities using existing plant data."
+        ]
+      },
+      {
+        "id": "exp_3",
+        "title": "AI Tools & Text-to-Speech Intern",
+        "organization": "Vaski Group Oy ",
+        "duration": "· November 2025 – February 2026",
+        "responsibilities": [
+          "•\tBenchmarked commercial and open-source AI voice and text-to-speech engines against quality, cost, language coverage and licensing criteria, and presented a recommendation adopted by the documentation team.",
+          "•\tAutomated the script-to-voice workflow for machine documentation videos, replacing manual narration recording with a repeatable pipeline and removing the re-recording cost of every script revision.",
+          "•\tEstablished a reusable process for producing consistent voice-over for technical training material, and worked directly with the documentation team to validate output quality against their editorial standards."
+        ],
+        "bullets": [
+          "Benchmarked commercial and open-source AI voice and text-to-speech engines for quality, cost, language coverage, and licensing.",
+          "Presented an engine recommendation adopted by the documentation team, based on benchmark findings.",
+          "Automated a repeatable script-to-voice workflow for machine documentation videos, replacing manual narration recording.",
+          "Eliminated narration re-recording costs for every script revision through the automated workflow.",
+          "Established a reusable process for consistent voice-over production for technical training material.",
+          "Validated voice-over output with the documentation team against editorial standards."
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Engineering ICT Robotic and AI",
+        "institution": "Häme University of Applied Sciences, HAMK",
+        "description": "",
+        "duration": ""
+      }
+    ],
+    "courses": [],
+    "certifications": [],
+    "languages": [
+      "english"
+    ],
+    "links": {
+      "linkedin": "https://www.linkedin.com/in/diwas-kharel-a77626395/",
+      "github": "https://github.com/diwaskharel-afk?tab=repositories"
+    },
+    "id_counters": {
+      "proj": 3,
+      "exp": 3,
+      "cert": 0,
+      "course": 0
+    }
+  },
+  "structured_jd": {
+    "title": "Researcher",
+    "company": null,
+    "seniority": null,
+    "requirements": [
+      "Ph.D. in Computer Science, Deep Learning, Machine Learning, Mathematics, or a related field",
+      "Research focus in AI",
+      "A good track record in AI research",
+      "Explainable AI research experience",
+      "AI Safety research experience",
+      "Strong proficiency in Large Language Models (LLMs)",
+      "Strong proficiency in neural networks",
+      "Strong proficiency in computer vision architectures",
+      "Strong background in Python programming",
+      "Strong background in Java programming",
+      "Strong background in C++ programming",
+      "Deep knowledge of machine learning frameworks (PyTorch, TensorFlow)",
+      "A strong publication record at top conferences"
+    ],
+    "preferred": [
+      "Experience aligning AI with human values and expectations",
+      "Experience improving model robustness",
+      "Experience in controlled learning",
+      "Experience in continual learning",
+      "Experience with neural network interpretability techniques",
+      "Experience with neural network editing techniques",
+      "Pioneering novel methods and neural networks that revolutionized machine learning, AI, or industry",
+      "Participation in ICPC, IOI/IMO, IOAI, or other international computer science, machine learning, or AI competitions"
+    ],
+    "responsibilities": [
+      "Create techniques to make AI models more interpretable, unbiased, transparent, and aligned with human values in real-world scenarios.",
+      "Create techniques to ensure consistent alignment between user-centric explanations and intrinsic model behavior.",
+      "Reverse-engineer neural networks to understand the internal workings of AI models.",
+      "Develop and implement data attribution methods that quantify the influence of specific text and image data points on a model's predictions.",
+      "Implement and integrate AI explainability techniques and tools.",
+      "Build rigorous benchmarks and datasets to measure explanation quality, model transparency, and treatment effectiveness.",
+      "Communicate insights to stakeholders."
+    ],
+    "tech_stack": [
+      "Python",
+      "Java",
+      "C++",
+      "PyTorch",
+      "TensorFlow"
+    ],
+    "keywords": [
+      "AI research",
+      "Explainable AI",
+      "AI Safety",
+      "Large Language Models",
+      "Neural networks",
+      "Computer vision",
+      "AI alignment",
+      "Human values",
+      "Model interpretability",
+      "Model transparency",
+      "Model robustness",
+      "Data attribution",
+      "Continual learning",
+      "Controlled learning",
+      "Neural network editing",
+      "AI explanations",
+      "Model behavior",
+      "Benchmarks",
+      "Datasets"
+    ]
+  },
+  "job_match": {
+    "items": [
+      {
+        "id": "exp_2",
+        "relevance": "high",
+        "reason": "Built an LLM-based RAG assistant with retrieval, citations, evidence-based refusals, and an internal technical report; does not demonstrate explainable AI research.",
+        "name": "AI Research & Industrial AI Assistant Intern at  Vaski Group Oy "
+      },
+      {
+        "id": "proj_1",
+        "relevance": "high",
+        "reason": "Built a Python LLM-agent pipeline with model evaluation, claim verification, and synthetic benchmarks, but not neural-network interpretability methods.",
+        "name": "Agentic-Data-Analyst"
+      },
+      {
+        "id": "exp_1",
+        "relevance": "medium",
+        "reason": "Applied neural embeddings and retrieval to an NLP recommendation system, without evidence of neural-network research or training.",
+        "name": "LLM & NLP Recommendation Systems Intern at RightProb Solutions "
+      },
+      {
+        "id": "proj_2",
+        "relevance": "medium",
+        "reason": "Implemented image detection and segmentation for robotics using classical computer vision, not computer vision neural architectures.",
+        "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE"
+      },
+      {
+        "id": "proj_3",
+        "relevance": "low",
+        "reason": "Shows Python, statistical analysis, and model evaluation, but little of the role's AI research focus.",
+        "name": "PL 2020-21 Season - Advanced Analysis Suite"
+      },
+      {
+        "id": "exp_3",
+        "relevance": "low",
+        "reason": "Benchmarked AI voice tools and communicated findings, but did not conduct the requested model research.",
+        "name": "AI Tools & Text-to-Speech Intern at Vaski Group Oy "
+      }
+    ],
+    "relevant_skills": [
+      "Python",
+      "LLMs",
+      "LangGraph",
+      "LangChain",
+      "RAG",
+      "Hybrid retrieval",
+      "Embeddings",
+      "FAISS",
+      "BM25",
+      "Reranking",
+      "Computer vision",
+      "Image segmentation",
+      "Model evaluation",
+      "Benchmarking",
+      "Scikit-learn",
+      "Docker"
+    ],
+    "missing": [
+      {
+        "requirement": "Ph.D. in Computer Science, Deep Learning, Machine Learning, Mathematics, or a related field",
+        "importance": "required",
+        "note": "Shows a Bachelor of Engineering, not a Ph.D."
+      },
+      {
+        "requirement": "Research focus in AI",
+        "importance": "required",
+        "note": "Shows applied AI projects and a research-titled internship, but no sustained AI research focus."
+      },
+      {
+        "requirement": "A good track record in AI research",
+        "importance": "required",
+        "note": "Shows applied projects and an internal report, not a demonstrated AI research track record."
+      },
+      {
+        "requirement": "Explainable AI research experience",
+        "importance": "required",
+        "note": "Claim verification and source citations are shown, but research into model explainability is not."
+      },
+      {
+        "requirement": "AI Safety research experience",
+        "importance": "required",
+        "note": "Evidence-based refusals for an industrial assistant are shown, but AI Safety research is not."
+      },
+      {
+        "requirement": "Strong proficiency in Large Language Models (LLMs)",
+        "importance": "required",
+        "note": "Shows substantial LLM application and integration, but not strong model-level proficiency through training or research."
+      },
+      {
+        "requirement": "Strong proficiency in neural networks",
+        "importance": "required",
+        "note": "Uses pretrained embedding models, but does not show neural-network design, training, or analysis."
+      },
+      {
+        "requirement": "Strong proficiency in computer vision architectures",
+        "importance": "required",
+        "note": "Has classical image-processing and shape-detection work, not computer vision neural architectures."
+      },
+      {
+        "requirement": "Strong background in Java programming",
+        "importance": "required",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Strong background in C++ programming",
+        "importance": "required",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Deep knowledge of machine learning frameworks (PyTorch, TensorFlow)",
+        "importance": "required",
+        "note": "Neither PyTorch nor TensorFlow is mentioned; the profile shows Scikit-learn instead."
+      },
+      {
+        "requirement": "A strong publication record at top conferences",
+        "importance": "required",
+        "note": "No conference publications are listed."
+      },
+      {
+        "requirement": "Experience aligning AI with human values and expectations",
+        "importance": "preferred",
+        "note": "Evidence-based refusals address unsupported answers, but human-value alignment work is not shown."
+      },
+      {
+        "requirement": "Experience improving model robustness",
+        "importance": "preferred",
+        "note": "Report verification and answer refusals are shown, but improvements to model robustness are not."
+      },
+      {
+        "requirement": "Experience in controlled learning",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Experience in continual learning",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Experience with neural network interpretability techniques",
+        "importance": "preferred",
+        "note": "No neural-network interpretability or reverse-engineering techniques are shown."
+      },
+      {
+        "requirement": "Experience with neural network editing techniques",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Pioneering novel methods and neural networks that revolutionized machine learning, AI, or industry",
+        "importance": "preferred",
+        "note": "Projects show implementations, not pioneering neural networks or methods with the stated impact."
+      },
+      {
+        "requirement": "Participation in ICPC, IOI/IMO, IOAI, or other international competitions",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Develop data attribution methods for text and image predictions",
+        "importance": "duty",
+        "note": "No methods quantifying individual data points' influence on predictions are shown."
+      },
+      {
+        "requirement": "Benchmark explanation quality, model transparency, and treatment effectiveness",
+        "importance": "duty",
+        "note": "Built general model-performance and voice-tool benchmarks, not explainability or transparency benchmarks."
+      },
+      {
+        "requirement": "Create techniques for unbiased model behavior",
+        "importance": "duty",
+        "note": "No bias measurement or mitigation techniques are shown."
+      },
+      {
+        "requirement": "Align user-centric explanations with intrinsic model behavior",
+        "importance": "duty",
+        "note": "Report claim checks and source citations do not test whether explanations reflect intrinsic model behavior."
+      }
+    ]
+  },
+  "gap_plan": {
+    "maybe_already_have": [
+      "The industrial assistant’s evidence-based refusals show applied safety work. Describe any documented failure analysis or controlled evaluations, but do not present deployment safeguards alone as AI Safety research.",
+      "If you trained or fine-tuned embedding models during the recommendation internship, specify the architecture, training objective, framework and evaluation results."
+    ],
+    "project_add_ons": [
+      {
+        "project_id": "proj_1",
+        "title": "Test whether model explanations are faithful",
+        "steps": [
+          "Add a small PyTorch multilayer-perceptron option to the supervised-prediction branch; retain its existing baseline and use held-out data.",
+          "Use Captum Integrated Gradients to attribute predictions to input features, then show plain-language feature explanations in the HTML report.",
+          "Benchmark explanation faithfulness by removing top-attributed features versus randomly selected features and measuring the change in predictions; report limitations when features are correlated.",
+          "Write a short research note stating the question, baselines, results and failure cases."
+        ],
+        "covers": [
+          "Research focus in AI",
+          "Explainable AI research experience",
+          "Strong proficiency in neural networks",
+          "Experience with neural network interpretability techniques",
+          "Benchmark explanation quality, model transparency, and treatment effectiveness",
+          "Align user-centric explanations with intrinsic model behavior"
+        ],
+        "why_it_fits": "Agentic-Data-Analyst already trains predictive models, generates explanations in reports and has a benchmark harness. This extension tests whether a reported explanation reflects the trained model.",
+        "effort": "weeks",
+        "cv_bullet_preview": "Trained a PyTorch prediction model and evaluated Captum feature explanations against deletion baselines, reporting when user-facing explanations failed to reflect model behavior.",
+        "project_name": "Agentic-Data-Analyst"
+      },
+      {
+        "project_id": "proj_1",
+        "title": "Run a controlled safety study of generated reports",
+        "steps": [
+          "Create synthetic datasets containing misleading text fields and cases where the generator is prompted to make unsupported numerical or safety-relevant claims.",
+          "Define a held-out test set and measure unsupported-claim rates and correct refusals for the current pipeline.",
+          "Add a structured-evidence check before report generation and compare results with and without it, including cases where legitimate claims are incorrectly rejected.",
+          "Document the threat model, test-set construction, results and remaining failure modes."
+        ],
+        "covers": [
+          "AI Safety research experience",
+          "Experience improving model robustness"
+        ],
+        "why_it_fits": "The existing report verifier, synthetic datasets and benchmark harness provide a natural baseline for a reproducible safety experiment rather than another unmeasured safeguard.",
+        "effort": "weeks",
+        "cv_bullet_preview": "Evaluated adversarial and unsupported claims in LLM-generated reports, comparing structured-evidence checks with the existing verifier and documenting safety trade-offs.",
+        "project_name": "Agentic-Data-Analyst"
+      },
+      {
+        "project_id": "proj_2",
+        "title": "Add and evaluate a neural vision classifier",
+        "steps": [
+          "Label a small set of existing camera images by shape, keeping images from the same capture session in the same train or test split.",
+          "Fine-tune a pretrained torchvision ResNet-18 classifier in PyTorch and compare held-out shape accuracy with the contour-based detector.",
+          "Test both methods under changed lighting and background conditions, and document error cases; keep robot execution disabled during evaluation."
+        ],
+        "covers": [
+          "Strong proficiency in neural networks",
+          "Strong proficiency in computer vision architectures"
+        ],
+        "why_it_fits": "The pick-and-place system already has a camera pipeline and a classical shape classifier, making a neural architecture comparison directly relevant.",
+        "effort": "weeks",
+        "cv_bullet_preview": "Fine-tuned a PyTorch ResNet-18 for camera-based shape classification and compared its held-out accuracy and lighting robustness with contour-based detection.",
+        "project_name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE"
+      }
+    ],
+    "new_projects": [],
+    "learning": [
+      {
+        "topic": "Machine-learning framework fundamentals",
+        "kind": "docs",
+        "suggestion": "Work through the official PyTorch Tutorials on training and saving a model, then TensorFlow’s Keras training tutorials. Keep runnable notebooks that train the same small classifier and compare gradients, evaluation and serialization. This is a start, not evidence of deep mastery.",
+        "covers": [
+          "Deep knowledge of machine learning frameworks (PyTorch, TensorFlow)"
+        ],
+        "effort": "days"
+      },
+      {
+        "topic": "Model-level LLM training",
+        "kind": "docs",
+        "suggestion": "Follow the Hugging Face Transformers and PEFT documentation to LoRA-fine-tune a small open-weight instruction model on synthetic supported-versus-unsupported report claims. Publish the split, training configuration and held-out comparison with the unfine-tuned model.",
+        "covers": [
+          "Strong proficiency in Large Language Models (LLMs)"
+        ],
+        "effort": "weeks"
+      }
+    ],
+    "not_fixable_now": [
+      {
+        "requirement": "Ph.D. in Computer Science, Deep Learning, Machine Learning, Mathematics, or a related field",
+        "how_to_address": "A Ph.D. cannot be obtained in weeks. Ask whether equivalent research experience is accepted; with only the listed bachelor’s degree, this researcher application is unlikely to succeed."
+      },
+      {
+        "requirement": "A good track record in AI research",
+        "how_to_address": "A good research track record takes sustained work. Use the proposed studies to begin one, seek a research supervisor and apply to junior research roles meanwhile; this requirement currently makes success unlikely."
+      },
+      {
+        "requirement": "Strong background in Java programming",
+        "how_to_address": "Strong Java proficiency takes substantially longer than a short plan. Disclose your current level, build and maintain Java work over months, and ask whether Java is essential; a strict requirement makes success unlikely."
+      },
+      {
+        "requirement": "Strong background in C++ programming",
+        "how_to_address": "Strong C++ proficiency takes substantially longer than a short plan. Disclose your current level, build and maintain C++ work over months, and ask whether C++ is essential; a strict requirement makes success unlikely."
+      },
+      {
+        "requirement": "Deep knowledge of machine learning frameworks (PyTorch, TensorFlow)",
+        "how_to_address": "The framework exercises can establish initial evidence, but deep knowledge of both PyTorch and TensorFlow takes months of substantial use. State that distinction honestly; if depth in both is mandatory, success is unlikely now."
+      },
+      {
+        "requirement": "A strong publication record at top conferences",
+        "how_to_address": "A strong top-conference publication record cannot be produced in weeks. Seek supervised research and a realistic multi-year publication path; if this is mandatory, the current application is unlikely to succeed."
+      },
+      {
+        "requirement": "Pioneering novel methods and neural networks that revolutionized machine learning, AI, or industry",
+        "how_to_address": "Revolutionary impact cannot be promised or manufactured through a short project. Describe verified contributions without claiming pioneering impact; if interpreted literally as a hiring requirement, success is unlikely."
+      }
+    ],
+    "uncovered": [
+      "Experience aligning AI with human values and expectations",
+      "Experience in controlled learning",
+      "Experience in continual learning",
+      "Experience with neural network editing techniques",
+      "Participation in ICPC, IOI/IMO, IOAI, or other international competitions",
+      "Develop data attribution methods for text and image predictions",
+      "Create techniques for unbiased model behavior"
+    ]
+  },
+  "final_cv": {
+    "name": "Diwas Kharel",
+    "contact": {
+      "address": "Kaartokatu 2 , helsinki",
+      "phone": "0449241055",
+      "email": "diwaskharel73@gmail.com"
+    },
+    "objective": "Early-career AI engineer with hands-on experience building LLM assistants, evaluating model outputs, and developing computer vision systems. Seeking to bring Python development, evidence-based retrieval, and benchmarking experience to the Researcher role at the hiring organization.",
+    "skills": [
+      "Python",
+      "LLMs",
+      "LangGraph",
+      "LangChain",
+      "RAG",
+      "Hybrid retrieval",
+      "Embeddings",
+      "FAISS",
+      "Computer vision",
+      "Image segmentation",
+      "Model evaluation",
+      "Benchmarking"
+    ],
+    "projects": [
+      {
+        "name": "Agentic-Data-Analyst",
+        "tech_stack": [
+          "Python",
+          "LangGraph",
+          "LangChain",
+          "E2B",
+          "Pydantic",
+          "Streamlit"
+        ],
+        "repo_url": "https://github.com/diwaskharel-afk/Agentic-Data-Analyst",
+        "bullets": [
+          "Designed a LangGraph pipeline with conditional routing for exploratory analysis, supervised prediction, and time-series forecasting.",
+          "Built LangChain ReAct agents that execute and iterate on analyses in a shared, persistent E2B Python sandbox.",
+          "Implemented dataset validation, feature preparation, model evaluation, and forecasting phases with typed Pydantic state and result schemas.",
+          "Created a separate LLM verification pass that checks report claims against ground-truth analysis state.",
+          "Built a benchmark harness using three synthetic datasets to test routing, state validity, and model performance against baselines."
+        ]
+      },
+      {
+        "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "tech_stack": [
+          "Streamlit"
+        ],
+        "repo_url": "https://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "bullets": [
+          "Built a camera-guided pick-and-place system that detects objects and maps their image coordinates to a Dobot MG400 robot workspace.",
+          "Segmented objects using thresholding and connected components, extracting masks, bounding boxes, and centers.",
+          "Detected circles, squares, and rectangles from contours and classified object colors using masked HSV values.",
+          "Implemented planning and automated execution modes, with a Streamlit interface for reviewing detections and coordinates."
+        ]
+      }
+    ],
+    "experience": [
+      {
+        "title": "AI Research & Industrial AI Assistant Intern",
+        "organization": " Vaski Group Oy ",
+        "duration": "April 2026 – June 2026",
+        "bullets": [
+          "Built an industrial RAG assistant that answers operator and maintenance questions using official manuals and training-video transcripts.",
+          "Developed PDF and video ingestion with section-aware chunking and source metadata, then combined semantic search, BM25, and reranking before GPT-4.1 synthesis.",
+          "Enforced source citations and evidence-based refusals for unsupported answers about safety circuits and machine-reset procedures.",
+          "Specified and validated CPU-only, on-premise deployment and designed an air-gapped variant using a local Ollama model.",
+          "Authored an internal technical report and deployment guide covering architecture, hardware, installation, and local-versus-cloud trade-offs."
+        ]
+      },
+      {
+        "title": "LLM & NLP Recommendation Systems Intern",
+        "organization": "RightProb Solutions ",
+        "duration": "May 2025 – July 2025",
+        "bullets": [
+          "Built a bidirectional semantic matching engine for candidate profiles and job vacancies, spanning data preparation, embeddings, indexing, retrieval, and interface.",
+          "Selected multilingual-e5-base for Finnish, English, and mixed-language records, and implemented cosine-similarity retrieval with FAISS.",
+          "Indexed 2,184 profiles and 1,000 job postings and delivered ranked matches in both directions.",
+          "Built a recruiter-facing CLI displaying scored top-k results to evaluate ranking quality and iterate on embeddings."
+        ]
+      },
+      {
+        "title": "AI Tools & Text-to-Speech Intern",
+        "organization": "Vaski Group Oy ",
+        "duration": "· November 2025 – February 2026",
+        "bullets": [
+          "Benchmarked commercial and open-source AI voice engines for quality, cost, language coverage, and licensing.",
+          "Presented a recommendation based on benchmark findings that the documentation team adopted.",
+          "Validated voice-over output against editorial standards and established a repeatable production workflow for technical training material."
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Engineering ICT Robotic and AI",
+        "institution": "Häme University of Applied Sciences, HAMK",
+        "description": "",
+        "duration": ""
+      }
+    ],
+    "courses": []
+  }
+}

@@ -1,6 +1,7 @@
 from model import (
     BulletList,
     FinalCV,
+    FinalCVCourse,
     FinalCVExperience,
     FinalCVProject,
     GapPlan,
@@ -11,16 +12,17 @@ from model import (
     StructuredProfile,
 )
 from state import AgentState
+from github_repo import RepoFetchError, fetch_readme, parse_github_url
 from llm import extract_structured
 from storage import assign_profile_ids
 from formatting import format_gaps, format_jd, format_job_match, format_profile, gap_ids, item_names
 from prompts import (
+    BULLETS_README_NOTE,
+    BULLETS_SYSTEM_PROMPT,
     CV_CONTENT_SYSTEM_PROMPT,
-    EXPERIENCE_BULLETS_SYSTEM_PROMPT,
     JD_EMPTY_REQUIREMENTS_NOTE,
     JD_SYSTEM_PROMPT,
     MATCH_PROFILE_SYSTEM_PROMPT,
-    PROJECT_BULLETS_SYSTEM_PROMPT,
     RECOMMEND_GAPS_SYSTEM_PROMPT,
 )
 
@@ -28,6 +30,7 @@ MIN_SOURCE_LEN = 20
 MAX_CV_BULLETS = 5
 MAX_CV_PROJECTS = 2
 MAX_CV_EXPERIENCE = 3
+MAX_CV_COURSES = 4
 MAX_CV_SKILLS = 20
 RELEVANCE_ORDER = {"high": 0, "medium": 1, "low": 2, "none": 3}
 IMPORTANCE_ORDER = {"required": 0, "preferred": 1, "duty": 2}
@@ -41,36 +44,67 @@ def intake_profile_node(state: AgentState) -> AgentState:
     return {"structured_profile": profile}
 
 
-def format_bullets_node(state: AgentState) -> AgentState:
+def fetch_readmes_node(state: AgentState) -> AgentState:
     profile = state.get("structured_profile")
     if profile is None:
         return {}
 
+    # A failed fetch never blocks saving: the project falls back to its description.
+    warnings = []
     for project in profile.projects:
-        text = project.description or ""
-        if project.outcomes:
-            text = f"{text}\nOutcomes: {project.outcomes}"
-        if len(text.strip()) < MIN_SOURCE_LEN:
+        project.readme = ""  # never keep a README from an earlier save or another URL
+        url = (project.repo_url or "").strip()
+        if not url:
             continue
-        header = f"Project: {project.name}"
-        if project.tech_stack:
-            header += f"\nTech stack: {', '.join(project.tech_stack)}"
-        user_text = f"{header}\n\n{text}"
-        result = extract_structured("bullets", PROJECT_BULLETS_SYSTEM_PROMPT, user_text, BulletList)
+        repo = parse_github_url(url)
+        if repo is None:
+            warnings.append(f"{project.name}: only GitHub repos can be read; the URL is kept as a CV link.")
+            continue
+        try:
+            readme = fetch_readme(repo)
+        except RepoFetchError as exc:
+            warnings.append(f"{project.name}: {exc}")
+            continue
+        if readme:
+            project.readme = readme
+        else:
+            warnings.append(f"{project.name}: the README of {repo} is empty.")
+    return {"structured_profile": profile, "profile_warnings": warnings}
+
+
+def format_bullets_node(state: AgentState) -> AgentState:
+    profile = state.get("structured_profile")
+    if profile is None:
+        return {}
+    warnings = list(state.get("profile_warnings", []))
+
+    for project in profile.projects:
+        description = project.description.strip()
+        readme = project.readme
+        if len(description) + len(readme) < MIN_SOURCE_LEN:
+            if not description and not readme:
+                warnings.append(f"{project.name}: no description and no readable README, so no bullets were written.")
+            continue
+        if readme:
+            sections = [f"=== DESCRIPTION ===\n{description}"] if description else []
+            sections.append(f"=== REPOSITORY README ===\n{readme}")
+            user_text = f"Project: {project.name}\n\n" + "\n\n".join(sections)
+            system_prompt = BULLETS_SYSTEM_PROMPT + BULLETS_README_NOTE
+        else:
+            user_text = f"Project: {project.name}\n\n{description}"
+            system_prompt = BULLETS_SYSTEM_PROMPT
+        result = extract_structured("bullets", system_prompt, user_text, BulletList)
         project.bullets = result.bullets[:15]
 
     for experience in profile.experience:
         text = "\n".join(experience.responsibilities)
         if len(text.strip()) < MIN_SOURCE_LEN:
             continue
-        header = f"Role: {experience.title} at {experience.organization}"
-        if experience.tech_stack:
-            header += f"\nTech stack: {', '.join(experience.tech_stack)}"
-        user_text = f"{header}\n\n{text}"
-        result = extract_structured("bullets", EXPERIENCE_BULLETS_SYSTEM_PROMPT, user_text, BulletList)
+        user_text = f"Role: {experience.title} at {experience.organization}\n\n{text}"
+        result = extract_structured("bullets", BULLETS_SYSTEM_PROMPT, user_text, BulletList)
         experience.bullets = result.bullets[:15]
 
-    return {"structured_profile": profile}
+    return {"structured_profile": profile, "profile_warnings": warnings}
 
 
 def parse_jd_node(state: AgentState) -> AgentState:
@@ -131,7 +165,7 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     final_projects = [
         FinalCVProject(
             name=source.name,
-            tech_stack=source.tech_stack,
+            tech_stack=gp.tech_stack,
             repo_url=source.repo_url,
             bullets=gp.bullets[:MAX_CV_BULLETS],
         )
@@ -151,10 +185,19 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
         if (source := experience_by_id.get(ge.id.strip()))
     ][:MAX_CV_EXPERIENCE]
 
+    courses_by_id = {c.id: c for c in profile.courses}
+    course_ids = dict.fromkeys(c.strip().strip("[]") for c in generated.courses)
+    final_courses = [
+        FinalCVCourse(name=source.name, provider=source.provider, date=source.date)
+        for course_id in course_ids
+        if (source := courses_by_id.get(course_id))
+    ][:MAX_CV_COURSES]
+
     final_cv = FinalCV(
         name=profile.name,
         contact=profile.contact,
-        education=profile.education,
+        education=profile.education,  # always on the CV, never chosen by the LLM
+        courses=final_courses,
         objective=generated.objective,
         skills=generated.skills[:MAX_CV_SKILLS],
         projects=final_projects,

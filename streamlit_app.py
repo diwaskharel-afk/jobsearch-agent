@@ -1,11 +1,13 @@
 import hashlib
 import json
 from datetime import datetime
+from uuid import uuid4
 
 import streamlit as st
 from pydantic import ValidationError
 
 import storage
+from github_repo import parse_github_url
 from graph import build_application_graph, build_profile_graph
 from llm import TASK_MODELS, model_for
 from model import FinalCV, GapPlan, JobMatch, StructuredJD
@@ -13,11 +15,117 @@ from render_cv import render_cv_pdf
 
 RELEVANCE_LABELS = {"high": "🟢 high", "medium": "🟡 medium", "low": "🟠 low", "none": "⚪ none"}
 EFFORT_LABELS = {"hours": "⏱ hours", "days": "📅 days", "weeks": "🗓 weeks", "months": "📆 months"}
-ITEM_TYPES = {"proj": "project", "exp": "experience", "cert": "certification", "edu": "course/education"}
+ITEM_TYPES = {"proj": "project", "exp": "experience", "cert": "certification", "course": "course"}
 
 
 def safe_filename(text: str | None, fallback: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in (text or "")).strip("_") or fallback
+
+
+# --- Profile entry cards ------------------------------------------------------------
+# Each multi-entry section (projects, courses, ...) is a list of cards kept in session
+# state, seeded once from the saved profile. Every card has a uid so its widget keys stay
+# stable when another card is removed.
+
+def section_entries(section: str, saved: list) -> list[dict]:
+    key = f"entries_{section}"
+    if key not in st.session_state:
+        st.session_state[key] = [{"uid": uuid4().hex, **item.model_dump()} for item in saved]
+    return st.session_state[key]
+
+
+def add_entry(section: str) -> None:
+    st.session_state[f"entries_{section}"].append({"uid": uuid4().hex})
+
+
+def remove_entry(section: str, uid: str) -> None:
+    key = f"entries_{section}"
+    st.session_state[key] = [e for e in st.session_state[key] if e["uid"] != uid]
+
+
+def entry_cards(section: str, noun: str, saved: list, render_fields) -> list[dict]:
+    """One bordered card per entry plus an "Add" button below them; returns each card's values.
+
+    render_fields(entry, key) draws a card's inputs and returns its values; key(field) gives
+    the card's widget key for that field.
+    """
+    values = []
+    for n, entry in enumerate(section_entries(section, saved), start=1):
+        uid = entry["uid"]
+        with st.container(border=True):
+            title_col, remove_col = st.columns([4, 1])
+            title_col.markdown(f"**{noun.capitalize()} {n}**")
+            remove_col.button("🗑 Remove", key=f"{section}_{uid}_remove", on_click=remove_entry, args=(section, uid))
+            values.append(render_fields(entry, lambda field, uid=uid: f"{section}_{uid}_{field}"))
+    st.button(f"➕ Add {noun}", key=f"{section}_add", on_click=add_entry, args=(section,))
+    return values
+
+
+def optional_text_area(label: str, value: str, key: str, toggle_label: str = "Add description") -> str:
+    """Text area hidden behind a checkbox; "" while the box is unticked."""
+    if st.checkbox(toggle_label, value=bool(value), key=f"{key}_toggle"):
+        return st.text_area(label, value=value, key=key)
+    return ""
+
+
+def education_fields(entry: dict, key) -> dict:
+    return {
+        "degree": st.text_input("Degree / programme", value=entry.get("degree") or "", key=key("degree")),
+        "institution": st.text_input("Institution", value=entry.get("institution") or "", key=key("institution")),
+        "duration": st.text_input("Duration", value=entry.get("duration") or "", key=key("duration")),
+        "description": optional_text_area("Description", entry.get("description") or "", key("description")),
+    }
+
+
+def course_fields(entry: dict, key) -> dict:
+    return {
+        "id": entry.get("id"),
+        "name": st.text_input("Course name", value=entry.get("name") or "", key=key("name")),
+        "provider": st.text_input("Provider (school or platform)", value=entry.get("provider") or "", key=key("provider")),
+        "date": st.text_input("Date", value=entry.get("date") or "", key=key("date")),
+        "description": optional_text_area("What it covered", entry.get("description") or "", key("description"),
+                                          toggle_label="Add what it covered"),
+    }
+
+
+def project_fields(entry: dict, key) -> dict:
+    return {
+        "id": entry.get("id"),
+        "repo_url": st.text_input("GitHub link", value=entry.get("repo_url") or "", key=key("repo_url"),
+                                  placeholder="https://github.com/you/project",
+                                  help="Also shown on the CV. Private repos need a GITHUB_TOKEN in .env."),
+        "name": st.text_input("Name", value=entry.get("name") or "", key=key("name"),
+                              help="Leave empty to use the repo's name."),
+        "description": optional_text_area("Description", entry.get("description") or "", key("description")),
+    }
+
+
+def experience_fields(entry: dict, key) -> dict:
+    title = st.text_input("Title", value=entry.get("title") or "", key=key("title"))
+    organization = st.text_input("Organization", value=entry.get("organization") or "", key=key("organization"))
+    duration = st.text_input("Duration", value=entry.get("duration") or "", key=key("duration"))
+    resp_raw = st.text_area("Responsibilities (one per line)", value="\n".join(entry.get("responsibilities") or []),
+                            key=key("responsibilities"))
+    return {
+        "id": entry.get("id"),
+        "title": title,
+        "organization": organization,
+        "duration": duration,
+        "responsibilities": [r.strip() for r in resp_raw.splitlines() if r.strip()],
+    }
+
+
+def certification_fields(entry: dict, key) -> dict:
+    return {
+        "id": entry.get("id"),
+        "name": st.text_input("Name", value=entry.get("name") or "", key=key("name")),
+        "issuer": st.text_input("Issuer", value=entry.get("issuer") or "", key=key("issuer")),
+        "date": st.text_input("Date", value=entry.get("date") or "", key=key("date")),
+    }
+
+
+def is_blank(entry: dict) -> bool:
+    return not any(value for field, value in entry.items() if field != "id")
 
 
 def render_job_match(match: JobMatch) -> None:
@@ -96,8 +204,8 @@ def render_gap_plan(plan: GapPlan) -> None:
         st.write(", ".join(plan.uncovered))
 
 
-st.set_page_config(page_title="Job Search Agent", page_icon="\U0001F4DD")
-st.title("Job Search Agent")
+st.set_page_config(page_title="JobFit", page_icon="\U0001F4DD")
+st.title("JobFit")
 
 existing = storage.load_profile()
 
@@ -106,99 +214,66 @@ profile_tab, jd_tab = st.tabs(["Profile", "Job Description"])
 with profile_tab:
     st.caption("Fill this out once; you can come back and edit it any time.")
 
-    edu_default = len(existing.education) if existing else 1
-    project_default = len(existing.projects) if existing else 1
-    experience_default = len(existing.experience) if existing else 0
-    cert_default = len(existing.certifications) if existing else 0
+    st.subheader("Basics")
+    name = st.text_input("Full name", value=(existing.name if existing else None) or "")
 
-    edu_count = st.number_input("How many education entries?", min_value=0, max_value=10, value=edu_default, step=1)
-    project_count = st.number_input("How many projects?", min_value=0, max_value=10, value=project_default, step=1)
-    experience_count = st.number_input("How many work/internship experiences?", min_value=0, max_value=10, value=experience_default, step=1)
-    cert_count = st.number_input("How many certifications?", min_value=0, max_value=10, value=cert_default, step=1)
+    st.subheader("Contact")
+    contact = existing.contact if existing else None
+    address = st.text_input("Address", value=(contact.address if contact else None) or "")
+    phone = st.text_input("Phone", value=(contact.phone if contact else None) or "")
+    email = st.text_input("Email", value=(contact.email if contact else None) or "")
 
-    with st.form("profile_form"):
-        st.subheader("Basics")
-        name = st.text_input("Full name", value=(existing.name if existing else None) or "")
-        summary = st.text_area("Short summary / objective", value=(existing.summary if existing else None) or "")
+    st.subheader("Skills & languages")
+    skills_raw = st.text_input("Skills (comma-separated)", value=", ".join(existing.skills) if existing else "")
+    languages_raw = st.text_input("Languages (comma-separated)", value=", ".join(existing.languages) if existing else "")
 
-        st.subheader("Contact")
-        contact = existing.contact if existing else None
-        address = st.text_input("Address", value=(contact.address if contact else None) or "")
-        phone = st.text_input("Phone", value=(contact.phone if contact else None) or "")
-        email = st.text_input("Email", value=(contact.email if contact else None) or "")
+    st.subheader("Links")
+    links = existing.links if existing else {}
+    linkedin = st.text_input("LinkedIn URL", value=links.get("linkedin", ""))
+    github = st.text_input("GitHub URL", value=links.get("github", ""))
+    portfolio = st.text_input("Portfolio URL", value=links.get("portfolio", ""))
 
-        st.subheader("Skills & languages")
-        skills_raw = st.text_input("Skills (comma-separated)", value=", ".join(existing.skills) if existing else "")
-        languages_raw = st.text_input("Languages (comma-separated)", value=", ".join(existing.languages) if existing else "")
+    st.subheader("Education")
+    st.caption("Always included on every CV.")
+    education_entries = entry_cards("education", "education", existing.education if existing else [],
+                                    education_fields)
 
-        st.subheader("Links")
-        links = existing.links if existing else {}
-        linkedin = st.text_input("LinkedIn URL", value=links.get("linkedin", ""))
-        github = st.text_input("GitHub URL", value=links.get("github", ""))
-        portfolio = st.text_input("Portfolio URL", value=links.get("portfolio", ""))
+    st.subheader("Courses")
+    st.caption("Only the courses relevant to a job are put on its CV.")
+    course_entries = entry_cards("courses", "course", existing.courses if existing else [], course_fields)
 
-        st.subheader("Education")
-        education_entries = []
-        for i in range(edu_count):
-            st.markdown(f"**Education #{i + 1}**")
-            existing_edu = existing.education[i] if existing and i < len(existing.education) else None
-            education_entries.append({
-                "id": existing_edu.id if existing_edu else None,
-                "course_name": st.text_input(f"Course/degree name #{i + 1}", value=existing_edu.course_name if existing_edu else "", key=f"edu_course_{i}"),
-                "institution": st.text_input(f"Institution #{i + 1}", value=(existing_edu.institution if existing_edu else None) or "", key=f"edu_institution_{i}"),
-                "description": st.text_area(f"Description #{i + 1}", value=(existing_edu.description if existing_edu else None) or "", key=f"edu_description_{i}"),
-                "duration": st.text_input(f"Duration #{i + 1}", value=(existing_edu.duration if existing_edu else None) or "", key=f"edu_duration_{i}"),
-            })
+    st.subheader("Projects")
+    st.caption("Paste the GitHub link: its README is read on every save and used to write the project's bullets. "
+               "Add a description for anything the README doesn't cover, or for a project without a repo.")
+    project_entries = entry_cards("projects", "project", existing.projects if existing else [], project_fields)
 
-        st.subheader("Projects")
-        project_entries = []
-        for i in range(project_count):
-            st.markdown(f"**Project #{i + 1}**")
-            existing_proj = existing.projects[i] if existing and i < len(existing.projects) else None
-            tech_default = ", ".join(existing_proj.tech_stack) if existing_proj else ""
-            tech_raw = st.text_input(f"Tech stack #{i + 1} (comma-separated)", value=tech_default, key=f"proj_tech_{i}")
-            project_entries.append({
-                "id": existing_proj.id if existing_proj else None,
-                "name": st.text_input(f"Project name #{i + 1}", value=existing_proj.name if existing_proj else "", key=f"proj_name_{i}"),
-                "description": st.text_area(f"Description #{i + 1}", value=existing_proj.description if existing_proj else "", key=f"proj_description_{i}"),
-                "tech_stack": [t.strip() for t in tech_raw.split(",") if t.strip()],
-                "repo_url": st.text_input(f"Repo URL #{i + 1}", value=(existing_proj.repo_url if existing_proj else None) or "", key=f"proj_repo_{i}"),
-                "outcomes": st.text_input(f"Outcomes #{i + 1}", value=(existing_proj.outcomes if existing_proj else None) or "", key=f"proj_outcomes_{i}"),
-            })
+    st.subheader("Experience")
+    experience_entries = entry_cards("experience", "experience", existing.experience if existing else [],
+                                     experience_fields)
 
-        st.subheader("Experience")
-        experience_entries = []
-        for i in range(experience_count):
-            st.markdown(f"**Experience #{i + 1}**")
-            existing_exp = existing.experience[i] if existing and i < len(existing.experience) else None
-            resp_default = "\n".join(existing_exp.responsibilities) if existing_exp else ""
-            tech_default = ", ".join(existing_exp.tech_stack) if existing_exp else ""
-            resp_raw = st.text_area(f"Responsibilities #{i + 1} (one per line)", value=resp_default, key=f"exp_resp_{i}")
-            tech_raw = st.text_input(f"Tech stack #{i + 1} (comma-separated)", value=tech_default, key=f"exp_tech_{i}")
-            experience_entries.append({
-                "id": existing_exp.id if existing_exp else None,
-                "title": st.text_input(f"Title #{i + 1}", value=existing_exp.title if existing_exp else "", key=f"exp_title_{i}"),
-                "organization": st.text_input(f"Organization #{i + 1}", value=existing_exp.organization if existing_exp else "", key=f"exp_org_{i}"),
-                "duration": st.text_input(f"Duration #{i + 1}", value=(existing_exp.duration if existing_exp else None) or "", key=f"exp_duration_{i}"),
-                "responsibilities": [r.strip() for r in resp_raw.splitlines() if r.strip()],
-                "tech_stack": [t.strip() for t in tech_raw.split(",") if t.strip()],
-            })
+    st.subheader("Certifications")
+    certification_entries = entry_cards("certifications", "certification",
+                                        existing.certifications if existing else [], certification_fields)
 
-        st.subheader("Certifications")
-        certification_entries = []
-        for i in range(cert_count):
-            st.markdown(f"**Certification #{i + 1}**")
-            existing_cert = existing.certifications[i] if existing and i < len(existing.certifications) else None
-            certification_entries.append({
-                "id": existing_cert.id if existing_cert else None,
-                "name": st.text_input(f"Name #{i + 1}", value=existing_cert.name if existing_cert else "", key=f"cert_name_{i}"),
-                "issuer": st.text_input(f"Issuer #{i + 1}", value=(existing_cert.issuer if existing_cert else None) or "", key=f"cert_issuer_{i}"),
-                "date": st.text_input(f"Date #{i + 1}", value=(existing_cert.date if existing_cert else None) or "", key=f"cert_date_{i}"),
-            })
+    st.divider()
+    submitted = st.button("Save profile", type="primary")
 
-        submitted = st.form_submit_button("Save profile")
-
+    problems = []
     if submitted:
+        for n, project in enumerate(project_entries, start=1):
+            if is_blank(project):
+                continue
+            repo = parse_github_url(project["repo_url"])
+            if not project["name"].strip() and repo:
+                project["name"] = repo.path.rsplit("/", 1)[-1] if repo.path else repo.repo
+            if not project["description"].strip() and not project["repo_url"].strip():
+                problems.append(f"Project {n} needs a GitHub link or a description.")
+            elif not project["name"].strip():
+                problems.append(f"Project {n} needs a name.")
+
+    if submitted and problems:
+        st.error("\n\n".join(problems))
+    elif submitted:
         links = {}
         if linkedin:
             links["linkedin"] = linkedin
@@ -209,23 +284,30 @@ with profile_tab:
 
         raw_profile = {
             "name": name or None,
-            "summary": summary or None,
             "contact": {"address": address or None, "phone": phone or None, "email": email or None},
             "skills": [s.strip() for s in skills_raw.split(",") if s.strip()],
             "languages": [l.strip() for l in languages_raw.split(",") if l.strip()],
             "links": links,
-            "education": education_entries,
-            "projects": project_entries,
-            "experience": experience_entries,
-            "certifications": certification_entries,
+            # Cards that were added but left empty are skipped.
+            "education": [e for e in education_entries if not is_blank(e)],
+            "courses": [c for c in course_entries if not is_blank(c)],
+            "projects": [p for p in project_entries if not is_blank(p)],
+            "experience": [e for e in experience_entries if not is_blank(e)],
+            "certifications": [c for c in certification_entries if not is_blank(c)],
             "id_counters": dict(existing.id_counters) if existing else {},
         }
 
         try:
             graph = build_profile_graph()
-            result = graph.invoke({"student_profile_input": raw_profile})
+            with st.spinner("Reading repo READMEs and writing bullets..."):
+                result = graph.invoke({"student_profile_input": raw_profile})
             storage.save_profile(result["structured_profile"])
+            # Re-seed the cards from the saved profile on the next run so new entries pick up their ids.
+            for section in ("education", "courses", "projects", "experience", "certifications"):
+                st.session_state.pop(f"entries_{section}", None)
             st.success("Profile saved.")
+            for warning in result.get("profile_warnings", []):
+                st.warning(warning)
             with st.expander("Saved profile (JSON)"):
                 st.json(result["structured_profile"].model_dump())
         except ValidationError as exc:

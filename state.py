@@ -6,6 +6,7 @@ from model import FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
 class AgentState(TypedDict, total=False):
     student_profile_input: dict            # raw form payload from Streamlit
     structured_profile: StructuredProfile  # validated output of the intake node, with ids
+    profile_warnings: list[str]            # shown after saving: unreadable repos, projects left without bullets
     jd_input: str                          # raw pasted job description
     structured_jd: StructuredJD            # LLM-extracted job description
     job_match: JobMatch                    # ranked items, relevant skills, missing requirements
