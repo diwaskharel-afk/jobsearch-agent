@@ -20,11 +20,11 @@ def format_jd(jd: StructuredJD) -> str:
 
 
 def item_names(profile: StructuredProfile) -> dict[str, str]:
-    """id -> display name for every project, experience, certification and education entry."""
+    """id -> display name for every project, experience, certification and course."""
     names = {p.id: p.name for p in profile.projects}
     names |= {e.id: f"{e.title} at {e.organization}" for e in profile.experience}
     names |= {c.id: c.name + (f" ({c.issuer})" if c.issuer else "") for c in profile.certifications}
-    names |= {e.id: e.course_name + (f" — {e.institution}" if e.institution else "") for e in profile.education}
+    names |= {c.id: c.name + (f" — {c.provider}" if c.provider else "") for c in profile.courses}
     return names
 
 
@@ -33,27 +33,25 @@ def format_profile(profile: StructuredProfile) -> str:
 
     for p in profile.projects:
         lines = [f"[{p.id}] Project: {p.name}"]
-        if p.tech_stack:
-            lines.append(f"  Tech stack: {', '.join(p.tech_stack)}")
-        body = p.bullets or [t for t in (p.description, p.outcomes) if t and t.strip()]
+        body = p.bullets or ([p.description] if p.description.strip() else [])
         lines += [f"  - {b}" for b in body]
         sections.append("\n".join(lines))
 
     for e in profile.experience:
         header = f"[{e.id}] Experience: {e.title} at {e.organization}"
         lines = [header + (f" ({e.duration})" if e.duration else "")]
-        if e.tech_stack:
-            lines.append(f"  Tech stack: {', '.join(e.tech_stack)}")
         lines += [f"  - {b}" for b in (e.bullets or e.responsibilities)]
         sections.append("\n".join(lines))
 
-    for edu in profile.education:
-        header = f"[{edu.id}] Course/Education: {edu.course_name}"
-        if edu.institution:
-            header += f" — {edu.institution}"
+    for c in profile.courses:
+        header = f"[{c.id}] Course: {c.name}"
+        if c.provider:
+            header += f" — {c.provider}"
+        if c.date:
+            header += f" ({c.date})"
         lines = [header]
-        if edu.description:
-            lines.append(f"  {edu.description}")
+        if c.description:
+            lines.append(f"  {c.description}")
         sections.append("\n".join(lines))
 
     for c in profile.certifications:
@@ -61,6 +59,17 @@ def format_profile(profile: StructuredProfile) -> str:
         if c.issuer:
             header += f" ({c.issuer})"
         sections.append(header)
+
+    # No ids: education is context (e.g. for degree requirements), never a ranked item.
+    for edu in profile.education:
+        line = f"Education: {edu.degree}"
+        if edu.institution:
+            line += f" — {edu.institution}"
+        if edu.duration:
+            line += f" ({edu.duration})"
+        if edu.description:
+            line += f"\n  {edu.description}"
+        sections.append(line)
 
     if profile.skills:
         sections.append(f"Skills: {', '.join(profile.skills)}")

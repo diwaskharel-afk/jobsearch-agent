@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, START, END
 
 from state import AgentState
 from nodes import (
+    fetch_readmes_node,
     format_bullets_node,
     generate_cv_content_node,
     intake_profile_node,
@@ -15,9 +16,11 @@ from nodes import (
 def build_profile_graph():
     graph = StateGraph(AgentState)
     graph.add_node("intake_profile", intake_profile_node)
+    graph.add_node("fetch_readmes", fetch_readmes_node)
     graph.add_node("format_bullets", format_bullets_node)
     graph.add_edge(START, "intake_profile")
-    graph.add_edge("intake_profile", "format_bullets")
+    graph.add_edge("intake_profile", "fetch_readmes")
+    graph.add_edge("fetch_readmes", "format_bullets")
     graph.add_edge("format_bullets", END)
     return graph.compile()
 

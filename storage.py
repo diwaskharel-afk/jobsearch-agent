@@ -9,7 +9,7 @@ from model import StructuredProfile
 PROFILE_PATH = Path("data/profile.json")
 
 # (profile attribute, id prefix)
-ID_PREFIXES = (("projects", "proj"), ("experience", "exp"), ("certifications", "cert"), ("education", "edu"))
+ID_PREFIXES = (("projects", "proj"), ("experience", "exp"), ("certifications", "cert"), ("courses", "course"))
 
 
 def assign_profile_ids(profile: StructuredProfile) -> StructuredProfile:

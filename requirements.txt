@@ -4,3 +4,4 @@ pydantic
 langchain-openai
 python-dotenv
 reportlab
+httpx
