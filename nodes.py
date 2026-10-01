@@ -1,21 +1,36 @@
+import hashlib
+
 from model import (
     BulletList,
     FinalCV,
     FinalCVCourse,
+    FinalCVEducation,
     FinalCVExperience,
     FinalCVProject,
     GapPlan,
     GeneratedCVContent,
     JobMatch,
+    ProfileExperience,
+    ProfileProject,
     RankedItem,
     StructuredJD,
     StructuredProfile,
 )
 from state import AgentState
 from github_repo import RepoFetchError, fetch_readme, parse_github_url
-from llm import extract_structured
+from llm import extract_structured, model_for
 from storage import assign_profile_ids
-from formatting import format_gaps, format_jd, format_job_match, format_profile, gap_ids, item_names
+from formatting import (
+    format_gaps,
+    format_jd,
+    format_job_match,
+    format_month,
+    format_profile,
+    format_range,
+    gap_ids,
+    item_names,
+    recency_key,
+)
 from prompts import (
     BULLETS_README_NOTE,
     BULLETS_SYSTEM_PROMPT,
@@ -41,6 +56,21 @@ MAX_PLAN_STEPS = 5
 def intake_profile_node(state: AgentState) -> AgentState:
     raw = state.get("student_profile_input", {})
     profile = assign_profile_ids(StructuredProfile.model_validate(raw))
+
+    # The form only sends what the user typed. READMEs and bullets come from the saved entry
+    # with the same id, so the next nodes only redo the work for what actually changed.
+    previous = state.get("previous_profile")
+    if previous is not None:
+        saved_projects = {p.id: p for p in previous.projects}
+        for project in profile.projects:
+            if saved := saved_projects.get(project.id):
+                if (saved.repo_url or "").strip() == (project.repo_url or "").strip():
+                    project.readme = saved.readme
+                project.bullets, project.bullets_source = list(saved.bullets), saved.bullets_source
+        saved_experience = {e.id: e for e in previous.experience}
+        for experience in profile.experience:
+            if saved := saved_experience.get(experience.id):
+                experience.bullets, experience.bullets_source = list(saved.bullets), saved.bullets_source
     return {"structured_profile": profile}
 
 
@@ -49,13 +79,20 @@ def fetch_readmes_node(state: AgentState) -> AgentState:
     if profile is None:
         return {}
 
+    # A README kept from the last save is reused, unless the user asked to re-read it.
+    # A missing one (new or changed link, or a fetch that failed last time) is fetched.
     # A failed fetch never blocks saving: the project falls back to its description.
+    refresh = set(state.get("refresh_readme_ids", []))
     warnings = []
+    actions = list(state.get("profile_actions", []))
     for project in profile.projects:
-        project.readme = ""  # never keep a README from an earlier save or another URL
         url = (project.repo_url or "").strip()
         if not url:
+            project.readme = ""
             continue
+        if project.readme and project.id not in refresh:
+            continue
+        project.readme = ""
         repo = parse_github_url(url)
         if repo is None:
             warnings.append(f"{project.name}: only GitHub repos can be read; the URL is kept as a CV link.")
@@ -65,11 +102,47 @@ def fetch_readmes_node(state: AgentState) -> AgentState:
         except RepoFetchError as exc:
             warnings.append(f"{project.name}: {exc}")
             continue
+        actions.append(f"read the README of {repo}")
         if readme:
             project.readme = readme
         else:
             warnings.append(f"{project.name}: the README of {repo} is empty.")
-    return {"structured_profile": profile, "profile_warnings": warnings}
+    return {"structured_profile": profile, "profile_warnings": warnings, "profile_actions": actions}
+
+
+def project_bullets_prompt(project: ProfileProject) -> tuple[str, str] | None:
+    """(system prompt, user text) for a project's bullets; None if there is too little text to write them from."""
+    description = project.description.strip()
+    readme = project.readme
+    if len(description) + len(readme) < MIN_SOURCE_LEN:
+        return None
+    if not readme:
+        return BULLETS_SYSTEM_PROMPT, f"Project: {project.name}\n\n{description}"
+    sections = [f"=== DESCRIPTION ===\n{description}"] if description else []
+    sections.append(f"=== REPOSITORY README ===\n{readme}")
+    return BULLETS_SYSTEM_PROMPT + BULLETS_README_NOTE, f"Project: {project.name}\n\n" + "\n\n".join(sections)
+
+
+def experience_bullets_prompt(experience: ProfileExperience) -> tuple[str, str] | None:
+    """(system prompt, user text) for an experience's bullets; None if there is too little text to write them from."""
+    text = "\n".join(experience.responsibilities)
+    if len(text.strip()) < MIN_SOURCE_LEN:
+        return None
+    return BULLETS_SYSTEM_PROMPT, f"Role: {experience.title} at {experience.organization}\n\n{text}"
+
+
+def refresh_bullets(item: ProfileProject | ProfileExperience, prompt: tuple[str, str] | None) -> bool:
+    """Write the item's bullets unless the exact same request wrote the ones it has. True if the LLM was called."""
+    if prompt is None:
+        item.bullets, item.bullets_source = [], ""
+        return False
+    system_prompt, user_text = prompt
+    source = hashlib.sha256("\n\n".join((model_for("bullets"), system_prompt, user_text)).encode()).hexdigest()
+    if item.bullets and item.bullets_source == source:
+        return False
+    item.bullets = extract_structured("bullets", system_prompt, user_text, BulletList).bullets[:15]
+    item.bullets_source = source
+    return True
 
 
 def format_bullets_node(state: AgentState) -> AgentState:
@@ -77,34 +150,20 @@ def format_bullets_node(state: AgentState) -> AgentState:
     if profile is None:
         return {}
     warnings = list(state.get("profile_warnings", []))
+    actions = list(state.get("profile_actions", []))
 
     for project in profile.projects:
-        description = project.description.strip()
-        readme = project.readme
-        if len(description) + len(readme) < MIN_SOURCE_LEN:
-            if not description and not readme:
-                warnings.append(f"{project.name}: no description and no readable README, so no bullets were written.")
-            continue
-        if readme:
-            sections = [f"=== DESCRIPTION ===\n{description}"] if description else []
-            sections.append(f"=== REPOSITORY README ===\n{readme}")
-            user_text = f"Project: {project.name}\n\n" + "\n\n".join(sections)
-            system_prompt = BULLETS_SYSTEM_PROMPT + BULLETS_README_NOTE
-        else:
-            user_text = f"Project: {project.name}\n\n{description}"
-            system_prompt = BULLETS_SYSTEM_PROMPT
-        result = extract_structured("bullets", system_prompt, user_text, BulletList)
-        project.bullets = result.bullets[:15]
+        prompt = project_bullets_prompt(project)
+        if prompt is None and not project.description.strip() and not project.readme:
+            warnings.append(f"{project.name}: no description and no readable README, so no bullets were written.")
+        if refresh_bullets(project, prompt):
+            actions.append(f"wrote bullets for {project.name}")
 
     for experience in profile.experience:
-        text = "\n".join(experience.responsibilities)
-        if len(text.strip()) < MIN_SOURCE_LEN:
-            continue
-        user_text = f"Role: {experience.title} at {experience.organization}\n\n{text}"
-        result = extract_structured("bullets", BULLETS_SYSTEM_PROMPT, user_text, BulletList)
-        experience.bullets = result.bullets[:15]
+        if refresh_bullets(experience, experience_bullets_prompt(experience)):
+            actions.append(f"wrote bullets for {experience.title} at {experience.organization}")
 
-    return {"structured_profile": profile, "profile_warnings": warnings}
+    return {"structured_profile": profile, "profile_warnings": warnings, "profile_actions": actions}
 
 
 def parse_jd_node(state: AgentState) -> AgentState:
@@ -160,7 +219,7 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     )
     generated = extract_structured("cv", CV_CONTENT_SYSTEM_PROMPT, user_text, GeneratedCVContent)
 
-    # Names, stacks, urls and durations always come from the saved profile, never the LLM.
+    # Names, stacks, urls and dates always come from the saved profile, never the LLM.
     projects_by_id = {p.id: p for p in profile.projects}
     final_projects = [
         FinalCVProject(
@@ -173,22 +232,27 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
         if (source := projects_by_id.get(gp.id.strip()))
     ][:MAX_CV_PROJECTS]
 
+    # The LLM picks experience by relevance; the CV lists the picked ones newest first.
     experience_by_id = {e.id: e for e in profile.experience}
+    picked_experience = [
+        (source, ge)
+        for ge in generated.experience
+        if (source := experience_by_id.get(ge.id.strip()))
+    ][:MAX_CV_EXPERIENCE]
     final_experience = [
         FinalCVExperience(
             title=source.title,
             organization=source.organization,
-            duration=source.duration,
+            duration=format_range(source),
             bullets=ge.bullets[:MAX_CV_BULLETS],
         )
-        for ge in generated.experience
-        if (source := experience_by_id.get(ge.id.strip()))
-    ][:MAX_CV_EXPERIENCE]
+        for source, ge in sorted(picked_experience, key=lambda pick: recency_key(pick[0]), reverse=True)
+    ]
 
     courses_by_id = {c.id: c for c in profile.courses}
     course_ids = dict.fromkeys(c.strip().strip("[]") for c in generated.courses)
     final_courses = [
-        FinalCVCourse(name=source.name, provider=source.provider, date=source.date)
+        FinalCVCourse(name=source.name, provider=source.provider, date=format_month(source.date) or None)
         for course_id in course_ids
         if (source := courses_by_id.get(course_id))
     ][:MAX_CV_COURSES]
@@ -196,7 +260,12 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     final_cv = FinalCV(
         name=profile.name,
         contact=profile.contact,
-        education=profile.education,  # always on the CV, never chosen by the LLM
+        education=[  # always on the CV, never chosen by the LLM
+            FinalCVEducation(degree=edu.degree, institution=edu.institution, description=edu.description,
+                             duration=format_range(edu),
+                             expected_graduation=format_month(edu.expected_graduation) or None)
+            for edu in sorted(profile.education, key=recency_key, reverse=True)
+        ],
         courses=final_courses,
         objective=generated.objective,
         skills=generated.skills[:MAX_CV_SKILLS],

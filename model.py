@@ -1,16 +1,41 @@
-from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Annotated, Literal, Optional
+from pydantic import BaseModel, Field, model_validator
+
+# Dates are a month of a year, stored as "YYYY-MM" so they sort as plain strings.
+# The form only offers month and year pickers; formatting.format_month turns them into "08.2024".
+YearMonth = Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
+
 class ContactInfo(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
 
-# Education always goes on the CV as entered, so it has no id and is never ranked.
-class EducationEntry(BaseModel):
+class DatedRange(BaseModel):
+    start: YearMonth
+    end: Optional[YearMonth] = None     # None = present
+
+    @model_validator(mode="after")
+    def _end_after_start(self):
+        if self.end is not None and self.end < self.start:
+            raise ValueError("end date is before start date")
+        return self
+
+# Education always goes on the CV (newest first), so it has no id and is never ranked.
+class EducationEntry(DatedRange):
     degree: str
     institution: Optional[str] = None
     description: Optional[str] = None
-    duration: Optional[str] = None
+    expected_graduation: Optional[YearMonth] = None  # only while ongoing (end is None), and then required
+
+    @model_validator(mode="after")
+    def _expected_graduation_while_ongoing(self):
+        if self.end is not None:
+            self.expected_graduation = None
+        elif self.expected_graduation is None:
+            raise ValueError("ongoing education needs an expected graduation date")
+        elif self.expected_graduation < self.start:
+            raise ValueError("expected graduation is before start date")
+        return self
 
 # Profile entries carry a code-assigned id (proj_1, exp_1, cert_1, course_1) that is
 # persisted in profile.json and survives edits — see storage.assign_profile_ids.
@@ -18,7 +43,7 @@ class CourseEntry(BaseModel):
     id: Optional[str] = None
     name: str
     provider: Optional[str] = None
-    date: Optional[str] = None
+    date: Optional[YearMonth] = None    # completion month
     description: Optional[str] = None
 
 class ProfileProject(BaseModel):
@@ -26,22 +51,23 @@ class ProfileProject(BaseModel):
     name: str
     description: str = ""               # optional when repo_url points to a GitHub repo with a README
     repo_url: Optional[str] = None
-    readme: str = ""                    # cleaned README of repo_url, re-fetched on every save; "" if none
+    readme: str = ""                    # cleaned README of repo_url, fetched when the link is added or changed; "" if none
     bullets: list[str] = Field(default_factory=list)
+    bullets_source: str = ""            # hash of the LLM request that wrote the bullets; unchanged -> bullets are reused
 
-class ProfileExperience(BaseModel):
+class ProfileExperience(DatedRange):
     id: Optional[str] = None
     title: str
     organization: str
-    duration: Optional[str] = None
     responsibilities: list[str] = Field(default_factory=list)
     bullets: list[str] = Field(default_factory=list)
+    bullets_source: str = ""            # see ProfileProject.bullets_source
 
 class Certification(BaseModel):
     id: Optional[str] = None
     name: str
     issuer: Optional[str] = None
-    date: Optional[str] = None
+    date: Optional[YearMonth] = None
 
 class StructuredProfile(BaseModel):
     name: Optional[str] = None
@@ -166,11 +192,19 @@ class FinalCVProject(BaseModel):
     repo_url: Optional[str] = None
     bullets: list[str] = Field(default_factory=list)
 
+# The CV holds dates as display text ("08.2024 – Present"), built by code from the profile.
 class FinalCVExperience(BaseModel):
     title: str
     organization: str
     duration: Optional[str] = None
     bullets: list[str] = Field(default_factory=list)
+
+class FinalCVEducation(BaseModel):
+    degree: str
+    institution: Optional[str] = None
+    description: Optional[str] = None
+    duration: Optional[str] = None
+    expected_graduation: Optional[str] = None  # "06.2027" while ongoing
 
 class FinalCVCourse(BaseModel):
     name: str
@@ -184,5 +218,5 @@ class FinalCV(BaseModel):
     skills: list[str] = Field(default_factory=list)
     projects: list[FinalCVProject] = Field(default_factory=list)
     experience: list[FinalCVExperience] = Field(default_factory=list)
-    education: list[EducationEntry] = Field(default_factory=list)  # always the full profile list
+    education: list[FinalCVEducation] = Field(default_factory=list)  # always the full profile list, newest first
     courses: list[FinalCVCourse] = Field(default_factory=list)     # only the ones chosen for this job

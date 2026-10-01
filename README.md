@@ -13,10 +13,17 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
 1. **Profile intake.** Fill out a form once: education, courses, projects, experience,
    skills, languages, certifications, contact info and links. Project and experience
    descriptions are rewritten by an LLM into 3–15 resume-style bullets. A project can
-   have a description, a GitHub repo URL, or both: the repo's README is read on every
-   save and used together with the description to write the bullets. The profile is
+   have a description, a GitHub repo URL, or both: the repo's README is read when the
+   link is added or changed (or on request) and used together with the description to
+   write the bullets. Saving only redoes the work for what changed: editing contact
+   details, skills, education, courses or certifications makes no LLM calls, and
+   editing one project or experience rewrites only that item's bullets. The profile is
    saved to `data/profile.json` and every entry gets a stable id (`proj_1`, `exp_1`,
-   `cert_1`, `course_1`). Education has no id: it always goes on the CV as entered.
+   `cert_1`, `course_1`). Education has no id: it always goes on the CV, newest first.
+   Dates are picked as month + year, never typed, and stored as `YYYY-MM`. Education and
+   experience need a start date and an end date or "present"; ongoing education also
+   needs an expected graduation date. Courses and certifications take an optional
+   month + year. Projects have no dates.
 2. **Profile vs job.** Paste a job description. The app extracts its title, company,
    seniority, requirements, preferred items, responsibilities, tech stack and ATS
    keywords, and then, in one LLM call:
@@ -27,7 +34,8 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
 3. **Then pick one of two actions:**
    - **Tailor CV.** Writes an objective, a skills list, and the most relevant projects
      and experience with reworded bullets, plus the relevant courses; education is always
-     included. It never claims a missing skill. You can
+     included. Experience and education are listed newest first, as dates like
+     `08.2024 – Present`. It never claims a missing skill. You can
      download the result as a PDF.
    - **Recommend for gaps.** Returns a prioritised plan: add-ons that extend your
      existing projects (with build steps and a preview CV bullet), small new projects,
@@ -100,23 +108,30 @@ JD tab:       parse_jd → match_profile ─┬─ mode = "cv"        → genera
 
 - **`intake_profile_node`** validates the form into a `StructuredProfile` and assigns
   persisted ids via `storage.assign_profile_ids`. Id numbers are never reused, so the
-  LLM can refer to items unambiguously.
-- **`fetch_readmes_node`** reads the README of every project with a GitHub repo URL
-  through the GitHub REST API (one request per repo) and strips badges, images and HTML.
-  The cleaned README is saved in the project's `readme` field and re-fetched on every
-  save, so it always matches the current URL. A repo that can't be read (private,
-  missing, rate limit, not on GitHub) gives a warning in the UI but doesn't block saving.
+  LLM can refer to items unambiguously. It then copies each project's README and each
+  item's bullets from the saved entry with the same id (the README only if the link is
+  unchanged), so the next two nodes only redo the work for what changed.
+- **`fetch_readmes_node`** reads the README of a project with a GitHub repo URL through
+  the GitHub REST API and strips badges, images and HTML. It only fetches when the
+  project has no stored README (a new or changed link, or a fetch that failed last time)
+  or when the user ticks "Re-read README from GitHub" on the project. The cleaned README
+  is saved in the project's `readme` field. A repo that can't be read (private, missing,
+  rate limit, not on GitHub) gives a warning in the UI but doesn't block saving.
 - **`format_bullets_node`** turns each project and experience description into resume
   bullets. For a project with a README, the description and the README are used together,
   with extra prompt rules that skip setup steps, roadmap items and marketing claims.
-  Entries with very little text are skipped.
+  A hash of the exact request (model, prompt and text) is saved in `bullets_source`; if
+  the next save would send the same request, the saved bullets are reused and no LLM
+  call is made. Changing the bullets prompt or `MODEL_BULLETS` therefore rewrites them
+  on the next save. Entries with very little text get no bullets.
 - **`parse_jd_node`** extracts a `StructuredJD`. If the requirements list comes back
   empty, it retries once with a stronger prompt.
 - **`match_profile_node`** returns a `JobMatch`. Code drops unknown or duplicate ids,
   attaches display names, and adds any item the model skipped as `none`.
 - **`generate_cv_content_node`** lets the LLM choose projects and experience by id and
-  write tailored bullets. Names, tech stacks, repo URLs and durations are always copied
-  from the saved profile, never from the LLM. The output is a `FinalCV`, which
+  write tailored bullets. The LLM picks experience by relevance; code keeps the top ones
+  and lists them newest first (ongoing on top, then by end and start date). Names, tech
+  stacks, repo URLs and dates are always copied from the saved profile, never from the LLM. The output is a `FinalCV`, which
   `render_cv.py` turns into a PDF.
 - **`recommend_gaps_node`** shows the gaps to the LLM as `gap_1`, `gap_2`, ….
   Code then swaps those ids for the requirement text, drops suggestions that cover no

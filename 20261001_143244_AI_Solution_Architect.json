@@ -1,0 +1,547 @@
+{
+  "saved_at": "2026-10-01T14:32:44",
+  "models": {
+    "bullets": "gpt-6-luna",
+    "parse_jd": "gpt-6-luna",
+    "match": "gpt-6-sol",
+    "cv": "gpt-6-sol",
+    "gaps": "gpt-6-sol"
+  },
+  "jd_input": "About the job\nDo you enjoy turning AI possibilities into scalable real-world solutions? We do.\n\nWe’re looking for an experienced AI Solution Architect to join Vincit and help our customers turn AI from hype into real business value.\n\nIn this role, you’ll combine hands-on technical expertise with a strong business mindset, working across software development, AI architecture, and customer collaboration. You’ll help customers identify where AI creates real value and design solutions that are both technically solid and commercially meaningful.\n\nWe’re looking for someone who enjoys staying close to the code while also helping customers and teams make the right technical and architectural decisions. You’ll work closely with clients, designers, software engineers, and data experts to shape AI solutions that scale beyond proof-of-concepts and deliver measurable impact.\n\nYou know you’ve succeeded when customers clearly understand the value of AI, solutions make it into production, and your work creates meaningful outcomes for both the business and its users.\n\nWhat is the job like, really?\n\nOur customer base and projects are broad and diverse, ranging from startups to globally operating enterprises, and from early-stage AI experiments to large-scale production solutions. You'll work in both advisory-focused engagements and hands-on delivery projects where Vincit takes full responsibility for the solution.\n\nHere’s a Snapshot Of Your Key Responsibilities\n\n☘️ Building AI solutions – designing and implementing production-grade AI applications, integrations, and agentic workflows together with development teams\n\n☘️ Acting as a technical lead – ensuring technical quality, clarity, and scalability throughout the delivery lifecycle\n\n☘️ Designing scalable architectures – creating technical blueprints and solution architectures for modern AI and cloud-native applications\n\n☘️ Consulting customers on AI opportunities – helping clients identify where AI can create genuine business value\n\n☘️ Leading discovery and proof-of-concepts – facilitating workshops, technical discovery sessions, and validating new ideas quickly\n\n☘️ Supporting sales and business development – shaping proposals and acting as a trusted technical expert in customer discussions\n\n☘️ Translating complexity into business value – communicating AI concepts clearly to both technical and executive audiences\n\n☘️ Sharing knowledge and mentoring others – supporting colleagues across engineering, design, and data disciplines\n\nWhat are we looking for? 🔍\n\nYou’ll do well in this role if you enjoy solving real business problems with technology. You’re comfortable moving between hands-on development, architectural thinking, and customer discussions, and you know how to translate technical possibilities into practical outcomes.\n\nYou’re also curious by nature and excited to keep learning – whether that means experimenting with the latest AI capabilities, exploring new cloud services, or finding better ways to build scalable AI solutions.\n\nYour background\n\n🎯 Strong software engineering background, ideally in web development, cloud-native applications, or distributed systems\n\n🎯 Strong experience designing and building AI-powered applications or solutions\n\n🎯 Experience with modern agentic AI patterns, workflows, and development practices\n\n🎯 Experience working with customer-facing projects or consultancy environments\n\n🎯 Strong understanding of cloud platforms (preferably Azure) and their AI capabilities\n\n🎯 Hands-on experience with modern AI frameworks and platforms such as LangChain, OpenAI, Anthropic Claude, Azure AI Foundry, or similar technologies\n\n🎯 Ability to combine technical expertise with business understanding\n\n🎯 Strong communication skills across both technical and business audiences\n\n🎯 Full professional proficiency in Finnish\n\nIt’s a Strong Plus If You Have\n\n🎯 Experience bringing AI or agentic AI solutions from proof-of-concept into production\n\n🎯 Experience with Azure AI services, Azure AI Foundry, or other modern AI platforms\n\n🎯 Certifications in Microsoft Azure (preferred), AWS, or Google Cloud technologies\n\nWhat's in it for you?\n\nAs a 500-person company, we combine the support and career opportunities of a larger organization with the agility and low hierarchy of a smaller one. This gives you both the structure to succeed and the freedom to shape how things are done – together with a supportive community around you.\n\nHere are a few more reasons why Vincit is worth considering:\n\n🌟 Variety and impact in projects – from smaller implementations to large business transformations, often involving real business change, not just system implementations.\n\n🌟 AI at the core – work with modern AI tools in your daily work, deepen your expertise, and contribute to building AI-driven solutions. In 2026, we became the first company in Finland to receive the ISO/IEC 42001 certification for our AI management system.\n\n🌟 Strong partner ecosystem – as a Microsoft Solutions Partner and SAP Gold Partner, we work closely with leading technology providers, giving you access to high-quality projects and deep expertise.\n\n🌟 Trusted and responsible way of working – our EcoVadis assessment and ISO certifications ensure high-quality, secure, and responsible delivery for our customers.\n\nAnd what else do you get as a Vincitizen?\n\n🌟 Flexibility & work-life balance – shape your work around your life, whether it’s family, hobbies, or something else important to you, while also making use of our top-notch office spaces in an award-winning workplace\n\n🌟 Solid pay – your monthly base salary reflects your experience and expertise. In addition, you’ll benefit from Vincit’s bonus model, personnel fund, and transparent salary weeks\n\n🌟 Comprehensive benefits – including lunch benefit, healthcare and dental services, insurance, childcare services, high-quality equipment, and more\n\n🌟 Growth & career opportunities – develop your skills through Univincity and shape your path toward new roles, specializations, or directions. Read inspiring examples of career paths in our career stories.\n\n🌟 Active communities – a transparent and humane organization where people connect, collaborate, and have fun together. It’s where our belief, “extraordinary things are created together”, comes to life – and one of the reasons we’re an award-winning workplace.\n\n🌟 Commitment to inclusion – we believe in a more inclusive digital world and strive to create a safe, welcoming welcoming workplace for everyone\n\n👉 Explore real-life examples of our human-centric culture in our People & Culture blog and learn more about how we work in our Code of Conduct\n\nCurious but still on the fence?\n\nIf you’d like to learn more about the role or have any questions, feel free to reach out to us at careers@vincit.com.\n\nTo get to know us as an employer, we recommend checking our career site, blog, Facebook, Instagram and LinkedIn. You might also like our post about Vincit’s candidate-friendly recruitment process.\n\nP.S. Please note that if you live abroad and want to work with us, we need you to have the necessary permits for working in Finland.\n\nAt Vincit, we turn digital into business results by combining leading enterprise platforms, AI solutions, and human-centric design. We help our customers make the most of SAP, Microsoft Azure, and other cloud ecosystems, embedding AI capabilities across their business operations and services.\n\nWe believe that extraordinary things are created together. That’s why we’re on a mission to create better Mondays – for our people, our clients, and our planet. Join us and become part of a community of top professionals across different areas of IT, united by curiosity, empathy, and a drive to build things that truly matter.",
+  "structured_profile": {
+    "name": "Diwas Kharel",
+    "contact": {
+      "address": "Kaartokatu 2 , helsinki",
+      "phone": "0449241055",
+      "email": "diwaskharel73@gmail.com"
+    },
+    "skills": [],
+    "projects": [
+      {
+        "id": "proj_1",
+        "name": "Agentic-Data-Analyst",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/Agentic-Data-Analyst",
+        "readme": "# Agentic Data Analyst\n\nAn agent that takes a raw CSV and a plain-English question, decides for itself\nwhether the job is exploration, supervised prediction, or forecasting, then\nruns the right analysis in a live Python sandbox and hands back a\nself-contained HTML report — plots, metrics, and a verification pass included.\n\n## The problem\n\nThe first version of this project was a single 100-line script: one\n`create_agent` ReAct loop, one `run_python` tool against an E2B sandbox, one\ngiant 5-phase system prompt, and `print(result)` as the only output. It\nworked, but:\n- nothing survived the run except stdout and stray PNGs — the actual report\n  lived inside a LangChain message object that got printed and discarded;\n- every tool call's full history was resent to the model on every turn, with\n  no truncation, no state contract, no way to check \"did it actually compute\n  what it claims\";\n- there was one run, on one dataset, that didn't even match the task it was\n  given — no way to tell if a prompt change made things better or worse.\n\n## Why an agentic approach at all\n\nData analysis is a good fit for the **code-execution agent** pattern (the\nsame idea behind Open Interpreter / ChatGPT's Code Interpreter): rather than\nasking an LLM to *describe* an analysis, give it a real Python kernel and let\nit write and run the code, read the actual output, and iterate. The\ninteresting engineering problem isn't \"can the model write pandas code\" — it's\n**boundaries and contracts**: deciding what each step is allowed to see, what\nit's required to produce, and how you'd know if it's wrong.\n\n## Architecture\n\nThe five analysis phases are explicit LangGraph nodes instead of one prompt\nhoping the model moves through them in order. Task classification is a real\nconditional edge, not a suggestion buried in a system prompt.\n\n```mermaid\nflowchart TD\n    classify[classify: eda / predict / forecast?] --> ingest[ingest & validate]\n    ingest --> eda[exploratory analysis]\n    eda -->|eda only| report[write report]\n    eda -->|predict or forecast| feature_prep[feature prep]\n    feature_prep -->|predict| model_predict[train & evaluate models]\n    feature_prep -->|forecast| model_forecast[backtest & forecast]\n    model_predict --> report\n    model_forecast --> report\n    report --> verify[verify report vs. ground truth]\n    verify --> END\n```\n\nEach node (`graph.py`) runs its own small, phase-scoped agent (`agent.py`) —\nits own tiny message history (base rules + phase prompt + current state\nsummary), not the whole run's transcript — against a shared, persistent E2B\nsandbox (`sandbox.py`). Every node reads/writes a single typed state object\n(`schema.py: AnalysisState`), which is what gets validated and dumped as\n`outputs/<run_id>/state.json`. Nothing in the final report is allowed to come\nfrom anywhere except that state.\n\n| Module | Responsibility |\n|---|---|\n| `config.py` | All configuration (dataset path, model, run limits, keys) from env/CLI — nothing hardcoded |\n| `schema.py` | Pydantic `AnalysisState`, `ModelResult`, `CostReport` — the data contract every node writes into |\n| `sandbox.py` | E2B lifecycle, `run_python` tool, plot + `state.json` pull-back |\n| `agent.py` | Builds the phase-scoped ReAct agent each node runs |\n| `graph.py` | The LangGraph wiring above |\n| `verifier.py` | Second LLM pass: checks the report's numeric claims against `AnalysisState` |\n| `cost.py` | Per-node token usage + wall-clock + sandbox-seconds |\n| `report.py` | Assembles one self-contained HTML file (report + embedded plots + metrics + verification + cost) |\n| `main.py` | CLI entrypoint / `run_pipeline()` used by both the CLI and the Streamlit app |\n| `prompts/*.md` | One prompt fragment per node, sharing `base_rules.md` |\n| `eval/` | Benchmark datasets + pass/fail harness (see below) |\n\n### Verification, not just generation\n\nAfter the report is written, `verifier.py` makes one extra no-tools LLM call:\ngiven the report text and the ground-truth `models_tried`/`forecast`/\n`eda_findings` from `state.json`, it flags any numeric claim that doesn't\ntrace back to real data. This is a soft **LLM-as-judge** check — cheap, and\nit catches the most common failure mode of report-writing agents\n(confidently restating a number that was never actually computed).\n\n### Cost/latency instrumentation\n\nEvery node's wall-clock time and token usage is tracked (`cost.py`) and shown\nin the final report and in eval output — so \"how much did this run cost\" is\nanswered, not guessed.\n\n## Example run\n\nAsk it to model insurance charges from `datasets/insurance.csv`. The run\nproduces `outputs/<run_id>/report.html` — a single file with the markdown\nreport, every plot the agent generated embedded as base64 (no external file\nrefs, so it's shareable standalone), a metrics table, the verification\nsection, and a cost breakdown.\n\n## Example output\n\nA real run on `datasets/insurance.csv` (`predict` branch) produces plots like\nthis one, generated and saved by the agent itself during EDA:\n\n...alongside a metrics table comparing every model tried:\n\n| Model                    | RMSE on Test Set |\n|---------------------------|------------------|\n| Mean Predictor (baseline) | 12830.81         |\n| Linear Regression         | 12356.45         |\n| Random Forest Regressor   | 13933.33         |\n\n...and a verification section confirming every number in the report traces\nback to real computed results:\n\n```\nVerification: OK — no discrepancies found.\n```\n\nAll of this — the markdown report, embedded plots, metrics table,\nverification, and a per-node cost/latency breakdown — ships as one\nself-contained `report.html` file.\n\n## Evaluation\n\n`eval/` is a tiny but real benchmark: three synthetic, deterministically\ngenerated datasets, one per pipeline branch (`eval/make_datasets.py`):\n\n| Dataset | Expected branch | What's checked |\n|---|---|---|\n| `eda_survey.csv` | `eda` | correct classification, valid `state.json` |\n| `insurance_like.csv` | `predict` (regression) | classification, valid state, best model beats the naive mean-predictor baseline |\n| `daily_sales.csv` | `forecast` (time series) | classification, valid state, best model beats a naive-forecast baseline on the backtest window |\n\nRun it with:\n\n```bash\npython -m eval.run_eval\n```\n\nThis makes real OpenAI + E2B calls, and writes a pass/fail-per-case summary to\n`eval/results.json` — useful for checking a prompt or model change hasn't\nregressed task classification or model quality, instead of eyeballing one run.\n\n## Limitations (by design, not bugs)\n\n- **Forecasting on non-temporal data is out of scope** — the `classify` node\n  requires a time dimension before routing to `model_forecast`; a dataset\n  without one is routed to `eda` or `predict` instead, and the report says so.\n  (This is exactly the mismatch the original single-script version had: it\n  was asked to forecast a non-temporal insurance dataset and just complied.)\n- The verifier checks *numeric consistency*, not *statistical correctness* —\n  it won't catch a p-hacked correlation, only a hallucinated one.\n- Each node's tool-call budget (`RUN_LIMIT_PER_NODE`, default 6) is a hard\n  cap; a very messy dataset can exhaust it mid-phase.\n- No persistence/checkpointing across runs yet — each run is one-shot. A\n  planner/executor split, cross-run memory, and an adversarial \"debate\" stage\n  (second perspective agent + judge) are natural next steps once this is\n  stable.\n\n## Running it\n\n```bash\ncp .env.example .env   # fill in OPENAI_API_KEY and E2B_API_KEY\n\npip install -r requirements.txt\n\n# CLI\npython main.py --dataset datasets/insurance.csv \\\n  --question \"Predict insurance claim amount from age, bmi, smoker status, and region\"\n\n# Streamlit demo\nstreamlit run streamlit_app.py\n\n# Eval harness\npython -m eval.run_eval\n\n# Docker\ndocker build -t agentic-data-analyst .\ndocker run --env-file .env -p 8501:8501 agentic-data-analyst\n```\n\n## License\n\nMIT — see [LICENSE](LICENSE).",
+        "bullets": [
+          "Designed a LangGraph pipeline with explicit nodes and conditional routing for exploratory analysis, supervised prediction, and forecasting.",
+          "Built phase-scoped LangChain ReAct agents that use concise state summaries and a shared persistent E2B Python sandbox.",
+          "Defined Pydantic AnalysisState, ModelResult, and CostReport schemas to structure node outputs and validate run state.",
+          "Implemented dataset ingestion and validation, exploratory analysis, feature preparation, model training, evaluation, and forecasting phases.",
+          "Added a no-tools LLM verification pass that checks report numeric claims against computed results stored in AnalysisState.",
+          "Generated self-contained HTML reports with embedded plots, metrics tables, verification results, and per-node cost breakdowns.",
+          "Instrumented token usage, wall-clock time, and E2B sandbox duration for pipeline nodes and evaluation output.",
+          "Created a deterministic benchmark harness covering EDA, regression prediction, and time-series forecasting with pass/fail checks.",
+          "Checked predictive and forecasting model results against naive baselines, alongside task classification and state validity.",
+          "Built CLI and Streamlit entry points around a shared run_pipeline function for executing analyses.",
+          "Containerized the application with Docker and configured dataset paths, model settings, run limits, and keys through environment variables and CLI."
+        ],
+        "bullets_source": "e1d0ba84d49bc620c4c103e576c50f67ca1ebeaeb1d20d2c6cedc2e0274e58e3"
+      },
+      {
+        "id": "proj_2",
+        "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "readme": "# Machine Vision Final Project\n## IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n\n### Course\nMachine Vision\nHAMK – Häme University of Applied Sciences\n\n### Team Members\n- Diwas Kharel\n- Bikash Basyal\n- Biswash Pokhrel\n\n---\n\n# 1. Project Overview\n\nThis project implements a **vision-guided robotic pick-and-place system** where a camera detects objects on a table and guides a **Dobot MG400 robot** to pick them and place them into a box.\n\nThe project integrates the building blocks developed during the Machine Vision course including:\n\n- Image preprocessing\n- Image segmentation\n- Coordinate mapping\n- Object detection\n- Color and shape selection\n- robot arm pick and place\n\nThe system converts object locations detected in the camera image into **robot workspace coordinates** and performs automated pick-and-place operations.\n\n---\n\n# 2. Project Goal\n\nThe goal of this project is to build a system capable of:\n\n- Calibrating a real camera with the robot workspace\n- Detecting objects and distingues its properties i.e color and shape from a camera image\n- Converting pixel coordinates (u, v) to robot coordinates (X, Y)\n- Providing two system modes:\n  - **Plan Mode**\n  - **Execute Mode**\n\n### Plan Mode\nThe system detects objects and computes robot coordinates without moving the robot.\n\n### Execute Mode\nThe system performs the full robot pick-and-place operation.\n\n---\n\n# 3. System Architecture\n\nThe project is structured into modular components.\nIMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE\n### Project Structure\n\n```\ncalibration/\nperception/\nutils/\noutput/\n\ncalibration.json\ndobot_api.py\ndobot_controller.py\napp_ui.py\nmain.py\ninputimage.jpy\n```\n\n---\n\n# 4. Calibration System\n\nThe calibration tool maps image coordinates to robot workspace coordinates.\n\nThe calibration process involves collecting at least **four-eight corresponding points**:\n\nPixel coordinates (u, v) : a click funtion to give pixel cordinate of each click\n\n```\nclick.py\n```\n\nRobot coordinates\n(X, Y) : using dobots studio and dobot arm\n\nUsing these correspondences, the system computes a **homography matrix (H)** that transforms coordinates from image space to robot workspace.\n\nThe calibration information is saved in a file:\n```\ncalibration.json\n```\n\n---\n# 5.Image Detection And Preprocessing\n\n## a. Image Preprocessing\n\nConverts the image to **HSV** (for color detection) and **grayscale** (for segmentation). **Otsu thresholding** automatically binarizes the image, and **morphological operations** clean up noise and fill gaps.\n\n**Result:** A binary image — objects in **white**, background in **black**.\n\n---\n\n## b. Object Segmentation\n\n**Connected Components Analysis** labels each white region as a separate object. Small and oversized regions are filtered out, and each valid object's **bounding box**, **center point**, and **mask** are extracted.\n\n**Result:** A list of candidate objects with location and size.\n\n---\n\n## c. Shape Detection\n\nThe object's **contour** is extracted and two features are computed:\n\n- **Circularity** — high value → **Circle**\n- **Polygon approximation** — 4 vertices → **Square** (aspect ratio ≈ 1) or **Rectangle**\n\n**Result:** Each object gets a **shape label**.\n\n---\n\n## d. Color Detection\n\nObject pixels are isolated using the **mask**, and the average **Hue** from the HSV image is mapped to a color: **Red, Orange, Green, or Blue**.\n\n**Result:** Each object gets a **color label**.\n\n---\n## Example\n### Any and all object and color detetion\n\ndetects all the shapes with everyclor present\n`python main.py detect --mode plan`\n### Color Detection\n\n**BlueandCircle.jpg** — Detects and highlights blue objects in the scene.\n`python main.py detect --color blue --mode plan`\n\n**OrangeObjet.jpg** — Detects and highlights orange objects in the scene.\n`python main.py detect --color orange --mode plan`\n\n---\n\n### Shape Detection\n\n**Circle.jpg** — Detects circular shapes\n`python main.py detect --shape circle  --mode plan`\n\n### Combined filteration\n\n**BlueandCircle.jpg** — Blue color filter for only square\n`python main.py detect --shape Square --color Blue --mode plan`\n\n# 6. Graphical User Interface (GUI)\n\nA graphical interface was implemented using **Streamlit** to allow an operator to interact with the system.\n\nThe GUI provides:\n\n- Live or captured camera image\n- Mode selection (Plan / Execute)\n- Color selection\n- Shape selection\n- Buttons for detection and robot execution\n\nThe interface also displays detected objects and computed robot coordinates.\n\n### GUI Screenshot\n\n---\n\n### Running the Project\n\nClone the repository\n\nRun GUI\n```\nstreamlit run app_streamlit.py\n```\n\n---\n\n# 7. Discussion\n\nThis project demonstrates the integration of machine vision and robotics for automated object manipulation. The system successfully performs camera calibration, object detection (i.e., color and shape), coordinate transformation, and robotic pick-and-place operations.\n\n### Observations\n\n- The system works reliably in detecting objects under moderate lighting conditions, though it has difficulty detecting very bright colors such as yellow and white.\n- Color detection is moderately reliable; some colors may be confused when brightness, shine, or texture varies.\n- shape detection testing was performed only on circles and squares, which gave 100% accurate results.\n- Pick-and-place operations succeed approximately 70–80% of the time. Failures are usually due to inaccuracies in detecting the true object center—sometimes the center is detected toward the edges, causing positioning errors.\n- The GUI improves usability for operators.\n### Our Expriene\n- The project required around 30–40 hours to complete. Most time was spent on color and shape detection, and robot movement\n- Significant effort was needed to fine-tune mean hue values for optimal color separation.\n- Robot control and movement were also challenging, particularly in setting up pick-and-place points, rest points, and movement paths. Some unnecessary movements and emergency stops occurred and where fixed.\n- As we were new to developing GUI, that also became difficult part .\n\n### Possible Improvements\n\n- Enable a live camera feed for real-time operation.\n- Improve robustness to lighting variations.\n- Implement real-time object tracking.\n- Add support for picking and sorting multiple object types.\n\n---\n\n# . Repository\n\nProject Repository:\n\nhttps://github.com/diwaskharel-afk/IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE",
+        "bullets": [
+          "Built a vision-guided pick-and-place system integrating camera-based object detection with a Dobot MG400 robot.",
+          "Calibrated the camera to the robot workspace using corresponding pixel and robot coordinates, computing a homography matrix saved in JSON.",
+          "Implemented image preprocessing with HSV and grayscale conversion, Otsu thresholding, and morphological operations to prepare object masks.",
+          "Segmented objects using connected components analysis, filtering regions by size and extracting bounding boxes, centers, and masks.",
+          "Classified object shapes using contour circularity and polygon approximation to distinguish circles, squares, and rectangles.",
+          "Detected red, orange, green, and blue objects by mapping average masked-pixel hue values in HSV images.",
+          "Mapped detected pixel coordinates to robot workspace coordinates and provided Plan and Execute operating modes.",
+          "Implemented Streamlit GUI controls for camera images, mode selection, color and shape filters, detection, and robot execution.",
+          "Integrated detection results and computed robot coordinates with robotic pick-and-place operations that place objects into a box."
+        ],
+        "bullets_source": "1b9898e2bf56c8e26dfcc5ca026a2d712611e78cb8e2355c1e85a3ce123502e0"
+      },
+      {
+        "id": "proj_3",
+        "name": "PL 2020-21 Season - Advanced Analysis Suite",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/football_analysis",
+        "readme": "# EPL 2020-21 Season - Advanced Analysis Suite\n\n## 🏆 Project Overview\n\nThis is a comprehensive, production-grade analysis of the English Premier League 2020-21 season data. The project features advanced statistical analysis, machine learning techniques, and sophisticated visualizations to extract meaningful insights about player and team performance.\n\n## 📊 Features\n\n### 1. Player Performance Analysis (`1_player_performance_analysis.py`)\n- **Top Performers Analysis**: Multi-metric evaluation of elite players\n- **Efficiency Analysis**:\n  - Actual vs Expected Goals (xG) analysis\n  - Actual vs Expected Assists (xA) analysis\n  - Position-based passing efficiency\n  - Productivity vs playing time correlation\n- **Positional Comparisons**: Statistical comparison across FW, MF, DF positions\n- **Young Talent Identification**: Custom talent scoring algorithm for players ≤23\n\n### 2. Club Performance Analysis (`2_club_performance_analysis.py`)\n- **Attacking Metrics**:\n  - Total goals and assists by club\n  - Goal efficiency (Actual/xG ratio)\n  - Expected vs actual performance\n- **Squad Composition**:\n  - Squad size and average age\n  - Position distribution\n  - Nationality diversity index\n- **Discipline Analysis**: Yellow/red card patterns and discipline index\n- **Club Clustering**: Hierarchical clustering to identify similar teams\n\n### 3. Statistical Analysis (`3_statistical_analysis.py`)\n- **Correlation Analysis**:\n  - Heatmaps showing relationships between 12+ metrics\n  - Top positive and negative correlations\n- **Regression Modeling**:\n  - Linear regression for goal prediction\n  - Multi-feature models with R² scoring\n  - Feature importance analysis\n- **Distribution Analysis**:\n  - Normality testing (Shapiro-Wilk test)\n  - KDE plots with statistical parameters\n- **Outlier Detection**: IQR-based outlier identification\n- **Comparative Tests**:\n  - ANOVA for age group comparisons\n  - T-tests for positional differences\n\n### 4. Advanced Visualizations (`4_advanced_visualizations.py`)\n- **Radar Charts**: Multi-dimensional player comparisons\n- **Bubble Charts**: 4-dimensional performance visualization\n- **Heatmaps**:\n  - Club vs Position performance matrices\n  - Age group vs performance\n  - Discipline patterns\n- **Scatter Matrices**: Pairwise relationship exploration\n- **Circular Bar Plots**: Radial rankings for top performers\n- **Advanced Comparisons**:\n  - Lollipop charts\n  - Diverging bar charts\n  - Violin plots for distribution comparisons\n\n## 🗂️ Project Structure\n\n```\nEPL_Analysis/\n│\n├── config.py                          # Configuration and utility functions\n├── master_analysis.py                 # Main script to run all analyses\n├── player_performance_analysis.py     # Player-focused analysis\n├── club_performance_analysis.py       # Club/team-focused analysis\n├── statistical_analysis.py            # Statistical methods and tests\n├── advanced_visualizations.py         # Creative visualizations\n├── requirements.txt                   # Python dependencies\n├── README.md                          # This file\n│\n├── EPL_20_21.csv                      # Input data (place your file here)\n│\n└── outputs/                           # Generated visualizations\n    ├── player_top_performers_multimet.png\n    ├── player_efficiency_analysis.png\n    ├── positional_performance_comparison.png\n    ├── young_talent_analysis.png\n    ├── club_attacking_performance.png\n    ├── squad_composition_analysis.png\n    ├── club_discipline_analysis.png\n    ├── club_clustering_analysis.png\n    ├── correlation_analysis.png\n    ├── regression_analysis.png\n    ├── distribution_analysis.png\n    ├── outlier_analysis.png\n    ├── statistical_comparisons.png\n    ├── player_radar_charts.png\n    ├── bubble_chart_analysis.png\n    ├── heatmap_visualizations.png\n    ├── scatter_matrix_analysis.png\n    ├── circular_bar_plots.png\n    └── advanced_comparison_plots.png\n```\n\n## 🚀 Installation & Setup\n\n### Prerequisites\n- Python 3.8 or higher\n- pip package manager\n\n### Installation Steps\n\n1. **Clone or download this project**\n\n2. **Install required packages**:\n```bash\npip install -r requirements.txt\n```\n\n3. **Place your data file**:\n   - Ensure `EPL_20_21.csv` is in the project root directory\n   - The CSV should have the following columns:\n     - Name, Club, Nationality, Position, Age, Matches, Starts, Mins\n     - Goals, Assists, Passes_Attempted, Perc_Passes_Completed\n     - Penalty_Goals, Penalty_Attempted, xG, xA\n     - Yellow_Cards, Red_Cards\n\n## 📖 Usage\n\n### Option 1: Run Complete Analysis Suite\n```bash\npython master_analysis.py\n```\nThis will execute all four analysis modules sequentially and generate all visualizations.\n\n### Option 2: Run Individual Modules\n```bash\n# Run only player performance analysis\npython master_analysis.py 1\n\n# Run only club performance analysis\npython master_analysis.py 2\n\n# Run only statistical analysis\npython master_analysis.py 3\n\n# Run only advanced visualizations\npython master_analysis.py 4\n```\n\n### Option 3: Run Specific Analysis Files Directly\n```bash\npython player_performance_analysis.py\npython club_performance_analysis.py\npython statistical_analysis.py\npython advanced_visualizations.py\n```\n\n## 📈 Key Metrics & Derived Features\n\n### Custom Calculated Metrics:\n- **MinsPerMatch**: Average minutes played per match\n- **GoalsPerMatch**: Goal scoring rate\n- **AssistsPerMatch**: Assist providing rate\n- **Goals+Assists**: Total goal contributions\n- **G+A_Per90**: Goal contributions per 90 minutes\n- **xG+xA**: Total expected goal contributions\n- **GoalConversionRate**: Goals per pass attempted (%)\n- **NonPenaltyGoals**: Goals excluding penalties\n- **xG_Overperformance**: Actual goals minus expected goals\n- **xA_Overperformance**: Actual assists minus expected assists\n- **Penalty_Conversion**: Penalty success rate (%)\n- **PassesPerMatch**: Average passes per match\n- **CardsPerMatch**: Disciplinary issues rate\n- **DisciplineScore**: Weighted card score (Yellow + Red×3)\n- **TalentScore**: Composite talent metric for young players\n\n## 🎯 Analysis Highlights\n\n### Player Insights:\n- Identifies top performers across 6+ different metrics\n- Compares actual performance vs expected metrics (xG, xA)\n- Analyzes efficiency by position and age\n- Discovers hidden talent among young players (U23)\n- Detects statistical outliers and exceptional performers\n\n### Club Insights:\n- Benchmarks attacking output across all 20 clubs\n- Evaluates goal efficiency (over/underperformance vs xG)\n- Analyzes squad demographics and composition\n- Identifies discipline patterns\n- Groups similar clubs using hierarchical clustering\n\n### Statistical Insights:\n- Reveals strongest correlations between performance metrics\n- Builds predictive models for goals and assists\n- Tests normality of key distributions\n- Identifies significant differences between positions and age groups\n- Provides statistical validation for observed patterns\n\n## 📊 Sample Outputs\n\nAll visualizations are saved as high-resolution PNG files (300 DPI) in the `outputs/` directory:\n\n1. **Player Performance**: 4 comprehensive visualizations\n2. **Club Analysis**: 4 detailed comparison charts\n3. **Statistical Analysis**: 5 statistical visualizations\n4. **Advanced Viz**: 6 creative and insightful plots\n\n**Total: 19 high-quality visualizations**\n\n## 🔧 Customization\n\n### Modify Analysis Parameters:\n\nEdit `config.py` to customize:\n- Figure sizes and DPI\n- Color palettes\n- Minimum playing time thresholds\n- Output directory location\n\n### Add New Metrics:\n\nIn `config.py`, modify the `create_derived_features()` method to add custom calculated metrics.\n\n### Adjust Visualizations:\n\nEach analysis file is modular - you can comment out specific visualizations or modify parameters within each method.\n\n## 📝 Data Requirements\n\nThe input CSV file should contain data for all EPL players from the 2020-21 season with these required columns:\n\n**Player Information:**\n- Name, Club, Nationality, Position, Age\n\n**Match Statistics:**\n- Matches, Starts, Mins (minutes played)\n\n**Performance Metrics:**\n- Goals, Assists, Passes_Attempted, Perc_Passes_Completed\n- Penalty_Goals, Penalty_Attempted\n- xG (expected goals), xA (expected assists)\n- Yellow_Cards, Red_Cards\n\n## 🐛 Troubleshooting\n\n### Common Issues:\n\n1. **ModuleNotFoundError**: Ensure all dependencies are installed\n   ```bash\n   pip install -r requirements.txt\n   ```\n\n2. **FileNotFoundError**: Verify `EPL_20_21.csv` is in the correct location\n   - Check the file path in `config.py` (DATA_PATH variable)\n\n3. **Memory Issues**: If running on limited RAM:\n   - Run individual modules instead of the complete suite\n   - Reduce figure sizes in `config.py`\n\n4. **Import Errors**: Use Python 3.8+\n   ```bash\n   python --version\n   ```\n\n## 🎓 Learning Resources\n\nThis project demonstrates:\n- Data cleaning and feature engineering\n- Statistical analysis and hypothesis testing\n- Regression modeling and prediction\n- Advanced data visualization techniques\n- Object-oriented programming in data science\n- Modular code organization\n\n## 🙏 Acknowledgments\n\n- Data from EPL 2020-21 season\n- Built with Python, Pandas, Matplotlib, Seaborn, Scikit-learn, and SciPy\n\n---\n\n**Last Updated**: 2026-02-09\n**Version**: 1.0.0\n\nFor questions or suggestions, feel free to open an issue or contribute to the project!",
+        "bullets": [
+          "Built Python analysis modules for English Premier League 2020–21 player, club, statistical, and visualization workflows.",
+          "Engineered player metrics including per-90 contributions, goal and assist overperformance, penalty conversion, and discipline scores.",
+          "Implemented player efficiency analyses comparing actual goals and assists with expected goals (xG) and expected assists (xA).",
+          "Developed position-based performance comparisons and a composite talent-scoring algorithm to identify players aged 23 and under.",
+          "Analyzed club attacking output, squad demographics, nationality diversity, and discipline patterns across teams.",
+          "Applied hierarchical clustering to group clubs by performance characteristics.",
+          "Built regression models for goal prediction with multiple features, R² scoring, and feature-importance analysis.",
+          "Performed correlation analysis, Shapiro-Wilk normality tests, IQR outlier detection, ANOVA, and positional t-tests using SciPy.",
+          "Created player radar charts, bubble charts, heatmaps, scatter matrices, circular rankings, violin plots, and comparative visualizations with Matplotlib and Seaborn.",
+          "Generated 19 high-resolution PNG visualizations through modular Python analysis scripts."
+        ],
+        "bullets_source": "1207315b87200e11adb701c01750537a5a8553602e5bd2fae95eeb16d020d80a"
+      },
+      {
+        "id": "proj_4",
+        "name": "JobFit - JobHelp Agent",
+        "description": "",
+        "repo_url": "https://github.com/diwaskharel-afk/jobsearch-agent",
+        "readme": "# JobFit\n\nA local Streamlit app that compares a candidate's profile with a pasted job description.\nIt ranks every project, experience, course and certification by relevance to the job,\nlists the relevant skills and the requirements the profile doesn't cover yet, and then\neither generates a tailored PDF CV or a concrete plan for closing those gaps.\n\nBuilt with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models via\n`langchain-openai`, Pydantic structured output, Streamlit and ReportLab.\n\n## Features\n\n1. **Profile intake.** Fill out a form once: education, courses, projects, experience,\n   skills, languages, certifications, contact info and links. Project and experience\n   descriptions are rewritten by an LLM into 3–15 resume-style bullets. A project can\n   have a description, a GitHub repo URL, or both: the repo's README is read on every\n   save and used together with the description to write the bullets. The profile is\n   saved to `data/profile.json` and every entry gets a stable id (`proj_1`, `exp_1`,\n   `cert_1`, `course_1`). Education has no id: it always goes on the CV as entered.\n2. **Profile vs job.** Paste a job description. The app extracts its title, company,\n   seniority, requirements, preferred items, responsibilities, tech stack and ATS\n   keywords, and then, in one LLM call:\n   - ranks each profile item as high / medium / low / none, with a one-line reason\n   - lists the candidate's skills relevant to this job\n   - lists the missing requirements (required / preferred / duty), with a note on what\n     exactly is lacking, e.g. \"has MySQL, not PostgreSQL\"\n3. **Then pick one of two actions:**\n   - **Tailor CV.** Writes an objective, a skills list, and the most relevant projects\n     and experience with reworded bullets, plus the relevant courses; education is always\n     included. It never claims a missing skill. You can\n     download the result as a PDF.\n   - **Recommend for gaps.** Returns a prioritised plan: add-ons that extend your\n     existing projects (with build steps and a preview CV bullet), small new projects,\n     courses, certifications or docs, hints for experience you may have left off your\n     profile, and honest advice for gaps that can't be closed quickly (degree, years\n     of experience, work permit, language).\n4. **Run snapshot.** Download a JSON file of each run (parsed JD, match, CV or gap plan,\n   the profile used, and the models used) to compare output quality across prompt\n   or model changes.\n\nThe parsed JD and the match are cached per job description and profile, so switching\nbetween \"Tailor CV\" and \"Recommend for gaps\" on the same job doesn't repeat those\nLLM calls.\n\n## Getting started\n\nRequirements: Python 3.10+ and an OpenAI API key.\n\n```bash\ngit clone https://github.com/hamk-ai-autumn-2026/jobsearch-agent.git\ncd jobsearch-agent\n\npython -m venv .venv\n# Windows\n.venv\\Scripts\\activate\n# macOS / Linux\nsource .venv/bin/activate\n\npip install -r requirements.txt\n\ncp .env.example .env   # then put your OPENAI_API_KEY in .env\nstreamlit run streamlit_app.py\n```\n\nOpen the **Profile** tab, fill it out and click **Save profile**. Then go to the\n**Job Description** tab, paste a job posting and choose **Tailor CV** or\n**Recommend for gaps**.\n\n## Configuration\n\nSettings are read from `.env`:\n\n| Variable | Purpose |\n|---|---|\n| `OPENAI_API_KEY` | Required. |\n| `GITHUB_TOKEN` | Optional. Reads READMEs of private repos and raises GitHub's limit from 60 to 5,000 requests per hour. Public repos work without it. |\n| `MODEL_BULLETS` | Model for rewriting descriptions into bullets (default `gpt-6-luna`) |\n| `MODEL_PARSE_JD` | Model for parsing the job description (default `gpt-6-luna`) |\n| `MODEL_MATCH` | Model for matching the profile to the job (default `gpt-6-sol`) |\n| `MODEL_CV` | Model for writing the tailored CV (default `gpt-6-sol`) |\n| `MODEL_GAPS` | Model for the gap plan (default `gpt-6-sol`) |\n\nEach task also has a fixed reasoning effort. Both the default models and the efforts are\nset in `TASK_MODELS` in `llm.py`.\n\nThe simple tasks (bullets, JD parsing) use the low-cost `gpt-6-luna`. The tasks that need\njudgment and must stay truthful (match, CV, gap plan) use `gpt-6-sol`. The frontier\n`gpt-6-astra` costs 5× as much as Sol, and none of these tasks needs it.\n\n## Architecture\n\nTwo LangGraph pipelines (`graph.py`) run over a shared `AgentState` (`state.py`):\n\n```\nProfile tab:  intake_profile → fetch_readmes → format_bullets\n\nJD tab:       parse_jd → match_profile ─┬─ mode = \"cv\"        → generate_cv_content\n                                        └─ mode = \"recommend\" → recommend_gaps\n```\n\n- **`intake_profile_node`** validates the form into a `StructuredProfile` and assigns\n  persisted ids via `storage.assign_profile_ids`. Id numbers are never reused, so the\n  LLM can refer to items unambiguously.\n- **`fetch_readmes_node`** reads the README of every project with a GitHub repo URL\n  through the GitHub REST API (one request per repo) and strips badges, images and HTML.\n  The cleaned README is saved in the project's `readme` field and re-fetched on every\n  save, so it always matches the current URL. A repo that can't be read (private,\n  missing, rate limit, not on GitHub) gives a warning in the UI but doesn't block saving.\n- **`format_bullets_node`** turns each project and experience description into resume\n  bullets. For a project with a README, the description and the README are used together,\n  with extra prompt rules that skip setup steps, roadmap items and marketing claims.\n  Entries with very little text are skipped.\n- **`parse_jd_node`** extracts a `StructuredJD`. If the requirements list comes back\n  empty, it retries once with a stronger prompt.\n- **`match_profile_node`** returns a `JobMatch`. Code drops unknown or duplicate ids,\n  attaches display names, and adds any item the model skipped as `none`.\n- **`generate_cv_content_node`** lets the LLM choose projects and experience by id and\n  write tailored bullets. Names, tech stacks, repo URLs and durations are always copied\n  from the saved profile, never from the LLM. The output is a `FinalCV`, which\n  `render_cv.py` turns into a PDF.\n- **`recommend_gaps_node`** shows the gaps to the LLM as `gap_1`, `gap_2`, ….\n  Code then swaps those ids for the requirement text, drops suggestions that cover no\n  real gap, sorts suggestions by importance and effort, and lists any gap left\n  without a suggestion as `uncovered`.\n\nIn short, the LLM refers to things by id and code resolves the ids against the saved\nprofile. That keeps names and facts from being invented.\n\n## Project structure\n\n| File | Responsibility |\n|---|---|\n| `streamlit_app.py` | UI: profile form, job description tab, results, downloads |\n| `graph.py` | LangGraph pipeline definitions and the CV / gaps branch |\n| `state.py` | Shared `AgentState` passed through each graph |\n| `nodes.py` | Graph node implementations |\n| `model.py` | Pydantic schemas: profile, JD, match, gap plan, CV |\n| `prompts.py` | LLM system prompts |\n| `llm.py` | Structured-output LLM calls and the model chosen for each task |\n| `formatting.py` | Turns the profile, JD and match into plain text for prompts |\n| `github_repo.py` | Parses GitHub repo URLs and fetches and cleans a repo's README |\n| `storage.py` | Loads and saves `data/profile.json` and assigns entry ids |\n| `render_cv.py` | Renders the final CV to PDF with ReportLab |\n\n## Data and privacy\n\nThis is a single-user local app: one profile, stored in `data/profile.json`. The `data/`\nfolder is in `.gitignore`, so personal details are never committed. Profile text, job\ndescriptions and the READMEs of linked repos (including private ones, if a `GITHUB_TOKEN`\nis set) are sent to the OpenAI API for processing.\n\n## Roadmap\n\n- Multiple users (key the profile path by user id)\n- Export the tailored CV as editable text or DOCX as well as PDF\n- Suggest improvements to existing bullets based on what a job asks for",
+        "bullets": [
+          "Built a local Streamlit app that compares candidate profiles with job descriptions and generates tailored CVs or gap plans.",
+          "Designed two LangGraph pipelines over a shared AgentState for profile intake and job-matching workflows.",
+          "Implemented profile intake with Pydantic validation, persistent entry IDs, and JSON storage for education, projects, experience, and credentials.",
+          "Integrated the GitHub REST API to fetch and clean project READMEs for LLM-assisted resume bullet generation.",
+          "Generated resume-style bullets from project and experience descriptions using OpenAI models via langchain-openai.",
+          "Parsed job descriptions into structured titles, requirements, responsibilities, technology stacks, seniority, and ATS keywords using Pydantic outputs.",
+          "Implemented profile-to-job matching that ranks entries, identifies relevant skills, and details uncovered requirements.",
+          "Built tailored CV generation that selects profile entries by ID and preserves saved names, technology stacks, URLs, and durations.",
+          "Rendered tailored CVs as downloadable PDFs using ReportLab.",
+          "Created prioritized gap-closing plans covering project extensions, new projects, courses, certifications, and unaddressed requirements.",
+          "Added per-job and profile caching to avoid repeating job-description parsing and profile-matching LLM calls when switching workflows.",
+          "Enabled downloadable JSON run snapshots containing parsed job descriptions, matches, generated outputs, profile data, and model selections."
+        ],
+        "bullets_source": "790458bd9b706067d1a5e7c5969d072725a69cb9e87b536bd2cb04b0e6c60523"
+      }
+    ],
+    "experience": [
+      {
+        "id": "exp_1",
+        "title": "LLM & NLP Recommendation Systems Intern",
+        "organization": "RightProb Solutions ",
+        "duration": "May 2025 – July 2025",
+        "responsibilities": [
+          "RightProb Solutions — Finland · May 2025 – July 2025",
+          "•\tBuilt an end-to-end bi-directional semantic matching engine pairing candidate profiles with job vacancies — the core recommendation component of the company's hiring platform — covering data preparation, embedding, indexing, retrieval and the recruiter-facing interface.",
+          "•\tEngineered the text representation layer: consolidated fragmented profile and vacancy records into single normalised documents (title + description composition, type coercion, missing-value handling) so one embedding captured the complete context of each entity.",
+          "•\tSelected intfloat/multilingual-e5-base (768-d) over English-only models so that Finnish, English and mixed-language CVs and job adverts could be matched inside a single shared vector space — a requirement the Finnish market makes unavoidable.",
+          "•\tImplemented cosine-similarity retrieval by L2-normalising all vectors into a FAISS IndexFlatIP index; built and persisted indexes covering 2,184 candidate profiles and 1,000 job postings so downstream services could query instantly without re-encoding the corpus.",
+          "•\tDelivered bi-directional ranked retrieval — candidate → best-fit vacancies and vacancy → best-fit candidates — reconstructing stored vectors directly from the FAISS index (reconstruct_n) so each internal query costs a single index lookup instead of a model forward pass.",
+          "•\tBuilt an interactive recruiter-facing CLI exposing scored top-k matches in both directions, used to qualitatively evaluate ranking quality and iterate on embedding model choice and text composition strategy.",
+          "•\tHandled the underlying data work throughout: collection, cleaning, deduplication and exploratory analysis of the profile and vacancy datasets prior to modelling."
+        ],
+        "bullets": [
+          "Built an end-to-end bidirectional semantic matching engine for candidate profiles and job vacancies, including embeddings, indexing, retrieval, and recruiter interface.",
+          "Consolidated fragmented candidate and vacancy records into normalized documents, composing titles and descriptions and handling types and missing values.",
+          "Selected intfloat/multilingual-e5-base (768-dimensional) to embed Finnish, English, and mixed-language profiles and vacancies in one vector space.",
+          "Implemented cosine-similarity retrieval with L2-normalized vectors and FAISS IndexFlatIP, persisting indexes for 2,184 profiles and 1,000 postings.",
+          "Delivered bidirectional ranked retrieval, matching candidates to vacancies and vacancies to candidates using FAISS reconstruct_n vector reconstruction.",
+          "Reduced internal query work to a single FAISS index lookup, avoiding model inference for reconstructed stored vectors.",
+          "Built an interactive recruiter-facing CLI displaying scored top-k matches in both directions for qualitative ranking evaluation.",
+          "Evaluated ranking quality and iterated on embedding model selection and text composition strategy using the recruiter-facing CLI.",
+          "Collected, cleaned, deduplicated, and explored candidate-profile and job-vacancy datasets before modeling."
+        ],
+        "bullets_source": "9fb1610b27df34e6935cf09af89d522076fbbbbfb076acd8229be35e5699c8a1"
+      },
+      {
+        "id": "exp_2",
+        "title": "AI Research & Industrial AI Assistant Intern",
+        "organization": " Vaski Group Oy ",
+        "duration": "April 2026 – June 2026",
+        "responsibilities": [
+          "Vaski Group Oy — Finland · April 2026 – June 2026",
+          "•\tDesigned, built and evaluated the VaskiPUNCH AI Assistant, a deployment-ready RAG chat system that answers operator and maintenance questions about an industrial punching machine using official PDF manuals and training-video transcripts as its only source of truth.",
+          "•\tBuilt the full ingestion pipeline: PDF text extraction, section-aware structural chunking, and transcription and chunking of training videos, indexed into a single searchable corpus with source metadata preserved so every answer remains traceable to its document or video.",
+          "•\tImplemented a three-stage hybrid retrieval architecture — parallel dense semantic search (all-MiniLM-L6-v2) and BM25 keyword search merged into a top-20 candidate pool, re-scored by a ms-marco-MiniLM-L-6-v2 cross-encoder into a top-10 shortlist, and synthesised by GPT-4.1 — substantially improving retrieval precision on terminology-heavy technical queries where pure semantic search alone missed exact part and alarm names.",
+          "•\tEnforced strict grounding as a hard safety requirement: every answer cites its source, and the system explicitly refuses when the evidence is absent rather than producing a plausible guess — critical when the output describes safety-circuit and machine-reset procedures.",
+          "•\tAdded a guidance layer that surfaces the relevant training video with a direct link alongside procedural answers, connecting written documentation to existing video training material.",
+          "•\tSpecified and validated a fully on-premise deployment: CPU-only inference on a mini-PC mounted at the machine, ~160 MB of local models, browser access for any tablet or laptop on the plant network with zero operator-side installation, and an air-gapped variant that swaps the GPT-4.1 call for a local Ollama model — removing the cloud dependency entirely and keeping proprietary manuals on-site.",
+          "•\tAuthored the internal technical report and deployment guide — architecture, hardware requirements, installation and startup automation, local-vs-cloud trade-offs — used by stakeholders to assess rollout across machines.",
+          "•\tResearched broader industrial AI opportunities (predictive maintenance, production monitoring, agent-assisted troubleshooting, factory optimisation) and assessed which were realistically achievable with LLM/NLP methods on the company's existing plant data."
+        ],
+        "bullets": [
+          "Designed, built, and evaluated VaskiPUNCH, a deployment-ready RAG assistant answering machine-operation and maintenance questions from official manuals and training transcripts.",
+          "Built an ingestion pipeline for PDF extraction, section-aware chunking, video transcription, and searchable indexing with source metadata.",
+          "Implemented hybrid retrieval using all-MiniLM-L6-v2 semantic search and BM25, combining results into a top-20 candidate pool.",
+          "Added ms-marco-MiniLM-L-6-v2 cross-encoder reranking and GPT-4.1 synthesis to improve precision on terminology-heavy technical queries.",
+          "Enforced source citations and evidence-based refusals to prevent unsupported answers about safety circuits and machine-reset procedures.",
+          "Connected procedural answers to relevant training videos with direct links, bridging written documentation and video training materials.",
+          "Specified and validated CPU-only, on-premise deployment on a mini-PC, with browser access over the plant network and no operator installation.",
+          "Designed an air-gapped deployment variant using a local Ollama model instead of GPT-4.1, keeping proprietary manuals on-site.",
+          "Authored the technical report and deployment guide covering architecture, hardware, installation, startup automation, and local-versus-cloud trade-offs.",
+          "Researched industrial AI opportunities and assessed predictive maintenance, production monitoring, troubleshooting, and factory optimisation using existing plant data."
+        ],
+        "bullets_source": "bf8c830e0499c1115196eed73dcc3e9d8a5e5cf29503db15e1b679ca38a8b2a9"
+      },
+      {
+        "id": "exp_3",
+        "title": "AI Tools & Text-to-Speech Intern",
+        "organization": "Vaski Group Oy ",
+        "duration": "· November 2025 – February 2026",
+        "responsibilities": [
+          "•\tBenchmarked commercial and open-source AI voice and text-to-speech engines against quality, cost, language coverage and licensing criteria, and presented a recommendation adopted by the documentation team.",
+          "•\tAutomated the script-to-voice workflow for machine documentation videos, replacing manual narration recording with a repeatable pipeline and removing the re-recording cost of every script revision.",
+          "•\tEstablished a reusable process for producing consistent voice-over for technical training material, and worked directly with the documentation team to validate output quality against their editorial standards."
+        ],
+        "bullets": [
+          "Benchmarked commercial and open-source AI voice and text-to-speech engines on quality, cost, language coverage, and licensing.",
+          "Presented an AI voice engine recommendation that the documentation team adopted.",
+          "Automated the script-to-voice workflow for machine documentation videos, replacing manual narration recording with a repeatable pipeline.",
+          "Eliminated re-recording costs for each script revision through the automated narration workflow.",
+          "Established a reusable voice-over production process for technical training material, validating output against the documentation team's editorial standards."
+        ],
+        "bullets_source": "f2ffdb0fd3300ceeb1a7e5358272f5eff275092e6f65c78fe74d17e59b79a80f"
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Engineering ICT Robotic and AI",
+        "institution": "Häme University of Applied Sciences, HAMK",
+        "description": "",
+        "duration": ""
+      }
+    ],
+    "courses": [],
+    "certifications": [],
+    "languages": [
+      "english"
+    ],
+    "links": {
+      "linkedin": "https://www.linkedin.com/in/diwas-kharel-a77626395/",
+      "github": "https://github.com/diwaskharel-afk?tab=repositories"
+    },
+    "id_counters": {
+      "proj": 4,
+      "exp": 3,
+      "cert": 0,
+      "course": 0
+    }
+  },
+  "structured_jd": {
+    "title": "AI Solution Architect",
+    "company": "Vincit",
+    "seniority": null,
+    "requirements": [
+      "Strong software engineering background",
+      "Strong experience designing and building AI-powered applications or solutions",
+      "Experience with modern agentic AI patterns",
+      "Experience with agentic AI workflows",
+      "Experience with agentic AI development practices",
+      "Experience with customer-facing projects or consultancy environments",
+      "Strong understanding of cloud platforms",
+      "Hands-on experience with modern AI frameworks and platforms such as LangChain, OpenAI, Anthropic Claude, Azure AI Foundry, or similar technologies",
+      "Ability to combine technical expertise with business understanding",
+      "Strong communication skills with technical and business audiences",
+      "Full professional proficiency in Finnish",
+      "Necessary permits to work in Finland, if living abroad and working in Finland"
+    ],
+    "preferred": [
+      "Experience in web development",
+      "Experience with cloud-native applications",
+      "Experience with distributed systems",
+      "Experience with Azure cloud platforms",
+      "Experience bringing AI or agentic AI solutions from proof-of-concept into production",
+      "Experience with Azure AI services",
+      "Experience with Azure AI Foundry",
+      "Experience with other modern AI platforms",
+      "Microsoft Azure certifications",
+      "AWS certifications",
+      "Google Cloud technology certifications"
+    ],
+    "responsibilities": [
+      "Design and implement production-grade AI applications, integrations, and agentic workflows with development teams.",
+      "Act as a technical lead, ensuring technical quality, clarity, and scalability throughout the delivery lifecycle.",
+      "Create technical blueprints and solution architectures for modern AI and cloud-native applications.",
+      "Help clients identify where AI can create genuine business value.",
+      "Lead workshops and technical discovery sessions, and validate new ideas through proof-of-concepts.",
+      "Shape proposals and act as a trusted technical expert in customer discussions.",
+      "Communicate AI concepts clearly to technical and executive audiences.",
+      "Share knowledge and mentor colleagues across engineering, design, and data disciplines."
+    ],
+    "tech_stack": [
+      "Azure",
+      "LangChain",
+      "OpenAI",
+      "Anthropic Claude",
+      "Azure AI Foundry",
+      "Azure AI Services",
+      "AWS",
+      "Google Cloud"
+    ],
+    "keywords": [
+      "AI Solution Architecture",
+      "AI applications",
+      "Agentic AI",
+      "AI workflows",
+      "Cloud-native",
+      "Distributed systems",
+      "Software engineering",
+      "Technical leadership",
+      "Solution architecture",
+      "AI consulting",
+      "Customer discovery",
+      "Proof-of-concept",
+      "Production AI",
+      "Business value",
+      "Cloud platforms",
+      "Azure",
+      "AI frameworks",
+      "Technical communication",
+      "Finnish"
+    ]
+  },
+  "job_match": {
+    "items": [
+      {
+        "id": "exp_2",
+        "relevance": "high",
+        "reason": "Designed a deployment-ready RAG assistant, documented its architecture, and assessed industrial AI opportunities and deployment trade-offs.",
+        "name": "AI Research & Industrial AI Assistant Intern at  Vaski Group Oy "
+      },
+      {
+        "id": "proj_1",
+        "relevance": "high",
+        "reason": "Built LangGraph and LangChain agentic workflows with validation, benchmarking, observability, and Docker packaging.",
+        "name": "Agentic-Data-Analyst"
+      },
+      {
+        "id": "proj_4",
+        "relevance": "high",
+        "reason": "Built an OpenAI-powered web app with LangGraph workflows, structured outputs, and external API integration.",
+        "name": "JobFit - JobHelp Agent"
+      },
+      {
+        "id": "exp_1",
+        "relevance": "high",
+        "reason": "Built an end-to-end AI matching application with retrieval and a recruiter-facing evaluation interface.",
+        "name": "LLM & NLP Recommendation Systems Intern at RightProb Solutions "
+      },
+      {
+        "id": "exp_3",
+        "relevance": "medium",
+        "reason": "Evaluated AI tools against cost and business needs and presented a recommendation adopted by a team, but did not build an agentic solution.",
+        "name": "AI Tools & Text-to-Speech Intern at Vaski Group Oy "
+      },
+      {
+        "id": "proj_2",
+        "relevance": "medium",
+        "reason": "Integrated computer vision, robotics, and a Streamlit interface, showing software engineering outside the job’s agentic AI focus.",
+        "name": "IMAGE-AND-SHAPE-DETECTABLE-PICK-AND-PLACE"
+      },
+      {
+        "id": "proj_3",
+        "relevance": "low",
+        "reason": "Shows Python modeling and analysis, but not AI application architecture, cloud, or agentic workflows.",
+        "name": "PL 2020-21 Season - Advanced Analysis Suite"
+      }
+    ],
+    "relevant_skills": [
+      "LangGraph",
+      "LangChain",
+      "Agentic workflows",
+      "OpenAI",
+      "RAG",
+      "Hybrid retrieval",
+      "Python",
+      "Pydantic",
+      "Docker",
+      "Streamlit",
+      "API integration",
+      "FAISS",
+      "AI evaluation",
+      "Solution architecture"
+    ],
+    "missing": [
+      {
+        "requirement": "Experience with customer-facing projects or consultancy environments",
+        "importance": "required",
+        "note": "Shows internal stakeholders and a recruiter-facing tool, but no explicit customer-facing project or consultancy work."
+      },
+      {
+        "requirement": "Strong understanding of cloud platforms",
+        "importance": "required",
+        "note": "Shows Docker and on-premise deployment, but no demonstrated Azure, AWS, or Google Cloud work."
+      },
+      {
+        "requirement": "Strong communication skills with technical and business audiences",
+        "importance": "required",
+        "note": "Shows a technical report and a team presentation, but communication with both technical and business audiences is not clearly demonstrated."
+      },
+      {
+        "requirement": "Full professional proficiency in Finnish",
+        "importance": "required",
+        "note": "not stated in profile"
+      },
+      {
+        "requirement": "Necessary permits to work in Finland, if living abroad and working in Finland",
+        "importance": "required",
+        "note": "not stated in profile"
+      },
+      {
+        "requirement": "Experience with cloud-native applications",
+        "importance": "preferred",
+        "note": "Has a Docker-containerized app and on-premise deployment design, but no cloud-native application is shown."
+      },
+      {
+        "requirement": "Experience with distributed systems",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Experience with Azure cloud platforms",
+        "importance": "preferred",
+        "note": "No Azure experience shown; deployment work is on-premise."
+      },
+      {
+        "requirement": "Experience bringing AI or agentic AI solutions from proof-of-concept into production",
+        "importance": "preferred",
+        "note": "Describes a deployment-ready assistant and validated deployment plans, but not an AI solution actually brought into production."
+      },
+      {
+        "requirement": "Experience with Azure AI services",
+        "importance": "preferred",
+        "note": "Has OpenAI integration, not Azure AI services."
+      },
+      {
+        "requirement": "Experience with Azure AI Foundry",
+        "importance": "preferred",
+        "note": "Has LangChain, LangGraph, and OpenAI experience, not Azure AI Foundry."
+      },
+      {
+        "requirement": "Microsoft Azure certifications",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "AWS certifications",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Google Cloud technology certifications",
+        "importance": "preferred",
+        "note": "not mentioned anywhere"
+      },
+      {
+        "requirement": "Act as a technical lead throughout the delivery lifecycle",
+        "importance": "duty",
+        "note": "Shows individual design and implementation work, but no technical lead responsibility."
+      },
+      {
+        "requirement": "Lead workshops and technical discovery sessions",
+        "importance": "duty",
+        "note": "No workshops or client technical discovery sessions are shown."
+      },
+      {
+        "requirement": "Shape proposals and act as a trusted technical expert in customer discussions",
+        "importance": "duty",
+        "note": "No proposal work or customer technical discussions are shown."
+      },
+      {
+        "requirement": "Communicate AI concepts to executive audiences",
+        "importance": "duty",
+        "note": "Shows a team recommendation and technical documentation, but no executive-audience communication."
+      },
+      {
+        "requirement": "Share knowledge and mentor colleagues",
+        "importance": "duty",
+        "note": "Documentation and a presentation are shown, but mentoring colleagues is not."
+      }
+    ]
+  },
+  "gap_plan": null,
+  "final_cv": {
+    "name": "Diwas Kharel",
+    "contact": {
+      "address": "Kaartokatu 2 , helsinki",
+      "phone": "0449241055",
+      "email": "diwaskharel73@gmail.com"
+    },
+    "objective": "Early-career AI engineer seeking the AI Solution Architect role at Vincit. Brings hands-on experience building LangGraph and LangChain agentic workflows, designing a deployment-ready industrial RAG assistant, and evaluating AI solutions against operational needs.",
+    "skills": [
+      "LangGraph",
+      "LangChain",
+      "Agentic workflows",
+      "OpenAI",
+      "RAG",
+      "Hybrid retrieval",
+      "Python",
+      "Pydantic",
+      "Streamlit",
+      "API integration",
+      "AI evaluation",
+      "Solution architecture"
+    ],
+    "projects": [
+      {
+        "name": "Agentic-Data-Analyst",
+        "tech_stack": [
+          "LangGraph",
+          "LangChain",
+          "Pydantic",
+          "E2B",
+          "Streamlit",
+          "Docker"
+        ],
+        "repo_url": "https://github.com/diwaskharel-afk/Agentic-Data-Analyst",
+        "bullets": [
+          "Designed a LangGraph workflow with conditional routing for exploratory analysis, supervised prediction, and forecasting.",
+          "Built phase-scoped LangChain ReAct agents using concise state summaries and a shared persistent E2B Python sandbox.",
+          "Defined Pydantic schemas for run state and results, and added an LLM verification pass to check report claims against computed values.",
+          "Built a deterministic benchmark harness with pass/fail checks and instrumented token usage, runtime, and sandbox duration.",
+          "Provided CLI and Streamlit entry points around a shared pipeline and containerized the application with Docker."
+        ]
+      },
+      {
+        "name": "JobFit - JobHelp Agent",
+        "tech_stack": [
+          "Streamlit",
+          "LangGraph",
+          "Pydantic",
+          "OpenAI",
+          "langchain-openai",
+          "ReportLab"
+        ],
+        "repo_url": "https://github.com/diwaskharel-afk/jobsearch-agent",
+        "bullets": [
+          "Built a Streamlit application that compares candidate profiles with job descriptions and generates tailored CVs or gap plans.",
+          "Designed two LangGraph workflows over shared state for profile intake and job matching.",
+          "Used Pydantic outputs to structure job requirements and OpenAI models via langchain-openai to generate resume-style bullets.",
+          "Integrated the GitHub REST API to retrieve project READMEs and implemented matching that ranks profile entries and identifies uncovered requirements.",
+          "Added caching for job parsing and matching calls, and rendered tailored CVs as downloadable PDFs with ReportLab."
+        ]
+      }
+    ],
+    "experience": [
+      {
+        "title": "AI Research & Industrial AI Assistant Intern",
+        "organization": " Vaski Group Oy ",
+        "duration": "April 2026 – June 2026",
+        "bullets": [
+          "Designed, built, and evaluated a deployment-ready RAG assistant for machine-operation and maintenance questions grounded in manuals and training transcripts.",
+          "Built PDF and video-transcript ingestion with source metadata, then combined semantic and BM25 retrieval with cross-encoder reranking and GPT-4.1 synthesis.",
+          "Enforced source citations and evidence-based refusals for unsupported answers about safety circuits and machine-reset procedures.",
+          "Specified and validated CPU-only, on-premise deployment and designed an air-gapped variant using a local Ollama model.",
+          "Authored architecture and deployment documentation covering hardware, installation, startup automation, and local-versus-cloud trade-offs; assessed industrial AI opportunities using existing plant data."
+        ]
+      },
+      {
+        "title": "LLM & NLP Recommendation Systems Intern",
+        "organization": "RightProb Solutions ",
+        "duration": "May 2025 – July 2025",
+        "bullets": [
+          "Built an end-to-end semantic matching application for candidate profiles and job vacancies, spanning data preparation, embeddings, indexing, retrieval, and a recruiter interface.",
+          "Selected a multilingual embedding model for Finnish, English, and mixed-language records and implemented cosine-similarity retrieval with persisted FAISS indexes.",
+          "Delivered bidirectional ranked matching across 2,184 profiles and 1,000 postings.",
+          "Built a recruiter-facing CLI for scored top-k results and used qualitative evaluation to refine model selection and text composition."
+        ]
+      },
+      {
+        "title": "AI Tools & Text-to-Speech Intern",
+        "organization": "Vaski Group Oy ",
+        "duration": "· November 2025 – February 2026",
+        "bullets": [
+          "Benchmarked commercial and open-source AI voice engines against quality, cost, language coverage, and licensing requirements.",
+          "Presented an engine recommendation adopted by the documentation team.",
+          "Automated the script-to-voice workflow for machine documentation videos, replacing manual recording with a repeatable process.",
+          "Validated voice-over output against the documentation team's editorial standards and eliminated re-recording costs for script revisions."
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Engineering ICT Robotic and AI",
+        "institution": "Häme University of Applied Sciences, HAMK",
+        "description": "",
+        "duration": ""
+      }
+    ],
+    "courses": []
+  }
+}

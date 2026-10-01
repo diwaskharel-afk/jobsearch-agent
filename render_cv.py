@@ -205,10 +205,14 @@ def _projects(cv: FinalCV) -> list:
 
 
 def _education(cv: FinalCV) -> list:
-    return _entries_section("Education", [
-        _entry(_e(edu.degree), edu.duration, _e(edu.institution) or None, [], edu.description)
-        for edu in cv.education
-    ])
+    entries = []
+    for edu in cv.education:
+        subtitle = [_e(edu.institution)] if _clean(edu.institution) else []
+        if _clean(edu.expected_graduation):
+            subtitle.append(f"Expected graduation {_e(edu.expected_graduation)}")
+        entries.append(_entry(_e(edu.degree), edu.duration, "&nbsp;&nbsp;·&nbsp; ".join(subtitle) or None, [],
+                              edu.description))
+    return _entries_section("Education", entries)
 
 
 def _courses(cv: FinalCV) -> list:

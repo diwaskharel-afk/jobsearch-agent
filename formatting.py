@@ -1,4 +1,22 @@
-from model import JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+from model import DatedRange, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+
+
+def format_month(year_month: str | None) -> str:
+    """"2024-08" -> "08.2024"; "" for no date."""
+    if not year_month:
+        return ""
+    year, month = year_month.split("-")
+    return f"{month}.{year}"
+
+
+def format_range(entry: DatedRange) -> str:
+    """"08.2024 – 06.2026", or "08.2024 – Present" while ongoing."""
+    return f"{format_month(entry.start)} – {format_month(entry.end) if entry.end else 'Present'}"
+
+
+def recency_key(entry: DatedRange) -> tuple[str, str]:
+    """Sort key for newest first (with reverse=True): end date, ongoing on top, then start date."""
+    return entry.end or "9999-99", entry.start
 
 
 def _section(heading: str, items: list[str]) -> list[str]:
@@ -39,7 +57,7 @@ def format_profile(profile: StructuredProfile) -> str:
 
     for e in profile.experience:
         header = f"[{e.id}] Experience: {e.title} at {e.organization}"
-        lines = [header + (f" ({e.duration})" if e.duration else "")]
+        lines = [f"{header} ({format_range(e)})"]
         lines += [f"  - {b}" for b in (e.bullets or e.responsibilities)]
         sections.append("\n".join(lines))
 
@@ -48,7 +66,7 @@ def format_profile(profile: StructuredProfile) -> str:
         if c.provider:
             header += f" — {c.provider}"
         if c.date:
-            header += f" ({c.date})"
+            header += f" (completed {format_month(c.date)})"
         lines = [header]
         if c.description:
             lines.append(f"  {c.description}")
@@ -58,6 +76,8 @@ def format_profile(profile: StructuredProfile) -> str:
         header = f"[{c.id}] Certification: {c.name}"
         if c.issuer:
             header += f" ({c.issuer})"
+        if c.date:
+            header += f", {format_month(c.date)}"
         sections.append(header)
 
     # No ids: education is context (e.g. for degree requirements), never a ranked item.
@@ -65,8 +85,9 @@ def format_profile(profile: StructuredProfile) -> str:
         line = f"Education: {edu.degree}"
         if edu.institution:
             line += f" — {edu.institution}"
-        if edu.duration:
-            line += f" ({edu.duration})"
+        line += f" ({format_range(edu)})"
+        if edu.expected_graduation:
+            line += f", expected graduation {format_month(edu.expected_graduation)}"
         if edu.description:
             line += f"\n  {edu.description}"
         sections.append(line)
