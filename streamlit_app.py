@@ -10,6 +10,7 @@ import storage
 from github_repo import parse_github_url
 from graph import build_application_graph, build_profile_graph
 from llm import TASK_MODELS, model_for
+from formatting import format_month
 from model import FinalCV, GapPlan, JobMatch, StructuredJD
 from render_cv import render_cv_pdf
 
@@ -19,8 +20,9 @@ ITEM_TYPES = {"proj": "project", "exp": "experience", "cert": "certification", "
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 PAST_YEARS = list(range(date.today().year, 1969, -1))
 FUTURE_YEARS = list(range(date.today().year, date.today().year + 9))
-EDUCATION_PRESENT = "Currently studying here"
+EDUCATION_PRESENT = "I'm currently studying here"
 EXPERIENCE_PRESENT = "I currently work here"
+DATED_SECTIONS = ("education", "experience")  # their cards need a start and an end (or present)
 
 
 def safe_filename(text: str | None, fallback: str) -> str:
@@ -58,10 +60,12 @@ def entry_cards(section: str, noun: str, saved: list, render_fields) -> list[dic
     for n, entry in enumerate(section_entries(section, saved), start=1):
         uid = entry["uid"]
         with st.container(border=True):
-            title_col, remove_col = st.columns([4, 1])
-            title_col.markdown(f"**{noun.capitalize()} {n}**")
+            title_col, remove_col = st.columns([4, 1], vertical_alignment="center")
+            title = title_col.empty()  # filled after the fields, so its date badge follows the pickers
             remove_col.button("🗑 Remove", key=f"{section}_{uid}_remove", on_click=remove_entry, args=(section, uid))
-            values.append(render_fields(entry, lambda field, uid=uid: f"{section}_{uid}_{field}"))
+            card = render_fields(entry, lambda field, uid=uid: f"{section}_{uid}_{field}")
+            title.markdown(f"**{noun.capitalize()} {n}** &nbsp; {date_badge(card, section in DATED_SECTIONS)}")
+            values.append(card)
     st.button(f"➕ Add {noun}", key=f"{section}_add", on_click=add_entry, args=(section,))
     return values
 
@@ -77,34 +81,68 @@ def optional_text_area(label: str, value: str, key: str, toggle_label: str = "Ad
 # Dates are picked as month + year and stored as "YYYY-MM". A picker with only one of the
 # two filled in returns a partial value (e.g. "2024-"), which date_problem reports on save.
 
-def month_year_picker(label: str, value: str | None, key: str, years: list[int]) -> str | None:
-    """Month and year dropdowns; "YYYY-MM", a partial value, or None when both are empty."""
+def is_full_date(value: str | None) -> bool:
+    return value is not None and len(value) == len("YYYY-MM")
+
+
+def month_year_picker(label: str, value: str | None, key: str, years: list[int], cols=None) -> str | None:
+    """A month and a year dropdown side by side, labelled once; "YYYY-MM", a partial value, or None.
+
+    cols is the (month, year) column pair to draw them in; by default the left half of a row.
+    """
     year, month = (int(value[:4]), int(value[5:])) if value else (None, None)
     if year is not None and year not in years:
         years = sorted({*years, year}, reverse=years[0] > years[-1])
-    month_col, year_col = st.columns(2)
-    month = month_col.selectbox(f"{label} – month", range(1, 13), index=month - 1 if month else None,
-                                format_func=lambda m: f"{m:02d} ({MONTH_NAMES[m - 1]})", placeholder="Month",
-                                key=f"{key}_month")
-    year = year_col.selectbox(f"{label} – year", years, index=years.index(year) if year else None,
-                              placeholder="Year", key=f"{key}_year")
+    month_col, year_col = cols or st.columns(4)[:2]
+    month = month_col.selectbox(label, range(1, 13), index=month - 1 if month else None,
+                                format_func=lambda m: MONTH_NAMES[m - 1], placeholder="Month", key=f"{key}_month")
+    # A short hidden label: a long one still wraps invisibly and pushes the row down.
+    year = year_col.selectbox("Year", years, index=years.index(year) if year else None,
+                              placeholder="Year", label_visibility="hidden", key=f"{key}_year")
     if month is None and year is None:
         return None
     return f"{year or ''}-{month:02d}" if month else f"{year}-"
 
 
-def date_range_fields(entry: dict, key, present_label: str) -> dict:
-    """From, To and a "present" checkbox that hides To; end is None while present is ticked."""
-    start = month_year_picker("From", entry.get("start"), key("start"), PAST_YEARS)
-    present = st.checkbox(present_label, value=bool(entry.get("start")) and not entry.get("end"), key=key("present"))
-    end = None if present else month_year_picker("To", entry.get("end"), key("end"), PAST_YEARS)
-    return {"start": start, "end": end, "present": present}
+def date_range_fields(entry: dict, key, present_label: str, expected_graduation: bool = False) -> dict:
+    """A "present" toggle over one row of From and To pickers; end is None while present is on.
+
+    While present is on, the To slot shows "Present", or for education (expected_graduation=True)
+    the expected graduation pickers, which are then required.
+    """
+    present = st.toggle(present_label, value=bool(entry.get("start")) and not entry.get("end"), key=key("present"))
+    cols = st.columns(4, vertical_alignment="bottom")
+    values = {"start": month_year_picker("From", entry.get("start"), key("start"), PAST_YEARS, cols[:2]),
+              "end": None, "present": present}
+    if not present:
+        values["end"] = month_year_picker("To", entry.get("end"), key("end"), PAST_YEARS, cols[2:])
+    elif expected_graduation:
+        values["expected_graduation"] = month_year_picker("Expected graduation", entry.get("expected_graduation"),
+                                                          key("expected_graduation"), FUTURE_YEARS, cols[2:])
+    else:
+        cols[2].text_input("To", value="Present", disabled=True, key=key("end_present"))
+    return values
+
+
+def date_badge(card: dict, required: bool) -> str:
+    """Card-header badge with the dates as the CV shows them; a warning while required ones are missing."""
+    start, end, completed = card.get("start"), card.get("end"), card.get("date")
+    if is_full_date(start) and card.get("present"):
+        badge = f":green-badge[:material/schedule: {format_month(start)} – Present]"
+        if is_full_date(card.get("expected_graduation")):
+            badge += f" :violet-badge[:material/school: Graduating {format_month(card['expected_graduation'])}]"
+        return badge
+    if is_full_date(start) and is_full_date(end):
+        return f":blue-badge[:material/calendar_month: {format_month(start)} – {format_month(end)}]"
+    if is_full_date(completed):
+        return f":blue-badge[:material/calendar_month: {format_month(completed)}]"
+    return ":orange-badge[:material/warning: Dates needed]" if required else ""
 
 
 def date_problem(value: str | None, what: str, required: bool) -> str | None:
     if value is None:
         return f"needs {what}" if required else None
-    if len(value) != len("YYYY-MM"):
+    if not is_full_date(value):
         return f"needs both the month and the year of {what}"
     return None
 
@@ -114,7 +152,7 @@ def range_problems(label: str, entry: dict, present_label: str) -> list[str]:
     if entry["present"]:
         later_field, later_name = "expected_graduation", "expected graduation date"
     else:
-        later_field, later_name = "end", f"end date (or tick \"{present_label}\")"
+        later_field, later_name = "end", f"end date (or turn on \"{present_label}\")"
     problems = [date_problem(entry["start"], "a start date", required=True)]
     if later_field in entry:  # experience has no expected graduation
         problems.append(date_problem(entry[later_field], f"an {later_name}", required=True))
@@ -129,11 +167,8 @@ def education_fields(entry: dict, key) -> dict:
     values = {
         "degree": st.text_input("Degree / programme", value=entry.get("degree") or "", key=key("degree")),
         "institution": st.text_input("Institution", value=entry.get("institution") or "", key=key("institution")),
-        **date_range_fields(entry, key, EDUCATION_PRESENT),
+        **date_range_fields(entry, key, EDUCATION_PRESENT, expected_graduation=True),
     }
-    if values["present"]:
-        values["expected_graduation"] = month_year_picker("Expected graduation", entry.get("expected_graduation"),
-                                                          key("expected_graduation"), FUTURE_YEARS)
     values["description"] = optional_text_area("Description", entry.get("description") or "", key("description"))
     return values
 
