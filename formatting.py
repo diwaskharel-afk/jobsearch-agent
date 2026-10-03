@@ -1,4 +1,4 @@
-from model import DatedRange, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+from model import DatedRange, FinalCV, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
 
 
 def format_month(year_month: str | None) -> str:
@@ -46,22 +46,27 @@ def item_names(profile: StructuredProfile) -> dict[str, str]:
     return names
 
 
-def format_profile(profile: StructuredProfile) -> str:
+def format_profile(profile: StructuredProfile, only_ids: set[str] | None = None) -> str:
+    """The profile as prompt text. only_ids limits the projects, experience, courses and
+    certifications to those ids (None = all); education, skills and languages are always shown."""
+    def shown(items: list) -> list:
+        return [i for i in items if only_ids is None or i.id in only_ids]
+
     sections = []
 
-    for p in profile.projects:
+    for p in shown(profile.projects):
         lines = [f"[{p.id}] Project: {p.name}"]
         body = p.bullets or ([p.description] if p.description.strip() else [])
         lines += [f"  - {b}" for b in body]
         sections.append("\n".join(lines))
 
-    for e in profile.experience:
+    for e in shown(profile.experience):
         header = f"[{e.id}] Experience: {e.title} at {e.organization}"
         lines = [f"{header} ({format_range(e)})"]
         lines += [f"  - {b}" for b in (e.bullets or e.responsibilities)]
         sections.append("\n".join(lines))
 
-    for c in profile.courses:
+    for c in shown(profile.courses):
         header = f"[{c.id}] Course: {c.name}"
         if c.provider:
             header += f" — {c.provider}"
@@ -72,7 +77,7 @@ def format_profile(profile: StructuredProfile) -> str:
             lines.append(f"  {c.description}")
         sections.append("\n".join(lines))
 
-    for c in profile.certifications:
+    for c in shown(profile.certifications):
         header = f"[{c.id}] Certification: {c.name}"
         if c.issuer:
             header += f" ({c.issuer})"
@@ -108,6 +113,22 @@ def format_job_match(match: JobMatch) -> str:
     if match.missing:
         lines.append("\nNot in the profile — never claim these:")
         lines += [f"- {m.requirement} ({m.importance})" for m in match.missing]
+    return "\n".join(lines)
+
+
+def format_missing(match: JobMatch) -> str:
+    return "\n".join(f"- {m.requirement} ({m.importance})" for m in match.missing)
+
+
+def format_cv_for_revision(cv: FinalCV) -> str:
+    """The parts of the CV a revision can change, with item ids."""
+    lines = [f"Objective: {cv.objective}", f"Skills: {', '.join(cv.skills)}"]
+    for p in cv.projects:
+        lines += [f"\n[{p.id}] Project: {p.name}", f"  Tech stack: {', '.join(p.tech_stack)}"]
+        lines += [f"  - {b}" for b in p.bullets]
+    for e in cv.experience:
+        lines.append(f"\n[{e.id}] Experience: {e.title} at {e.organization} ({e.duration})")
+        lines += [f"  - {b}" for b in e.bullets]
     return "\n".join(lines)
 
 

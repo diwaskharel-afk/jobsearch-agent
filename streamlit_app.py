@@ -1,5 +1,7 @@
 import hashlib
 import json
+import re
+import textwrap
 from datetime import date, datetime
 from uuid import uuid4
 
@@ -11,8 +13,9 @@ from github_repo import parse_github_url
 from graph import build_application_graph, build_profile_graph
 from llm import TASK_MODELS, model_for
 from formatting import format_month
-from model import FinalCV, GapPlan, JobMatch, StructuredJD
-from render_cv import render_cv_pdf
+from model import CVRevision, FinalCV, GapPlan, JobMatch, RevisedCVItem, StructuredJD, StructuredProfile
+from nodes import apply_revision
+from render_cv import MAX_TECH_SHOWN, _clean, _date, _pretty_project_name, render_cv_pdf
 
 RELEVANCE_LABELS = {"high": "🟢 high", "medium": "🟡 medium", "low": "🟠 low", "none": "⚪ none"}
 EFFORT_LABELS = {"hours": "⏱ hours", "days": "📅 days", "weeks": "🗓 weeks", "months": "📆 months"}
@@ -23,6 +26,9 @@ FUTURE_YEARS = list(range(date.today().year, date.today().year + 9))
 EDUCATION_PRESENT = "I'm currently studying here"
 EXPERIENCE_PRESENT = "I currently work here"
 DATED_SECTIONS = ("education", "experience")  # their cards need a start and an end (or present)
+REVISION_KEYS = ("cv_history", "last_revision", "revisions", "cv_editing")  # reset whenever a new CV is generated
+REVISION_PLACEHOLDER = ("e.g. Don't call me junior in the profile. Add my Docker sandbox work to the analyst "
+                        "project. Remove Excel from skills.")
 
 
 def safe_filename(text: str | None, fallback: str) -> str:
@@ -305,6 +311,200 @@ def render_gap_plan(plan: GapPlan) -> None:
         st.write(", ".join(plan.uncovered))
 
 
+# --- CV preview -----------------------------------------------------------------------
+# A rough on-screen version of the CV: the PDF's content and section order without its
+# styling. Text goes through render_cv's helpers, so dates and names read as on the PDF.
+# Keep it in step with render_cv_pdf when a section is added there.
+
+def md(text: str | None) -> str:
+    """CV text as literal markdown: "$50k" isn't maths and "C#" or "snake_case" isn't formatting."""
+    return re.sub(r"([\\`*_\[\]<>#~|$])", r"\\\1", _clean(text))
+
+
+def preview_section(title: str) -> None:
+    st.markdown(f"**{title.upper()}**")
+
+
+def preview_entry(title: str, date: str | None, subtitle: str | None, bullets: list[str],
+                  description: str | None = None) -> None:
+    """Title with its date on the right, then an italic subtitle, a description and bullets."""
+    title_col, date_col = st.columns([3, 1])
+    title_col.markdown(f"**{title}**" + (f"  \n*{subtitle}*" if subtitle else ""))
+    if _date(date):
+        date_col.caption(md(_date(date)), text_alignment="right")
+    if _clean(description):
+        st.markdown(md(description))
+    if bullets := [b for b in bullets if _clean(b)]:
+        st.markdown("\n".join(f"- {md(b)}" for b in bullets))
+
+
+def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0) -> CVRevision | None:
+    """With edit, the text a revision can change (objective, skills, bullets, tech stacks) becomes
+    boxes in its place, and the edits come back as a CVRevision; call it inside a form. Keys carry
+    the version, so the boxes refill after an AI revision or an Undo."""
+    items = []
+    with st.container(border=not edit):
+        if _clean(cv.name):
+            st.markdown(f"## {md(cv.name)}", anchors=False)
+        contact = cv.contact
+        parts = [md(value) for value in (contact.email, contact.phone, contact.address) if _clean(value)] \
+            if contact else []
+        if parts:
+            st.caption(" &nbsp;|&nbsp; ".join(parts))
+
+        if edit:
+            preview_section("Profile")
+            objective = st.text_area("Profile", value=cv.objective, key=f"edit_objective_{version}",
+                                     height=120, label_visibility="collapsed")
+        elif _clean(cv.objective):
+            preview_section("Profile")
+            st.markdown(md(cv.objective))
+
+        if edit:
+            preview_section("Skills")
+            skills = st.text_area("Skills", value="\n".join(cv.skills), key=f"edit_skills_{version}",
+                                  placeholder="One skill per line", label_visibility="collapsed")
+        elif skills := [md(s) for s in cv.skills if _clean(s)]:
+            preview_section("Skills")
+            st.markdown(" · ".join(skills))
+
+        def edit_boxes(entry, has_stack: bool) -> None:
+            """The entry's tech stack and bullets as boxes; items without an id can't be patched, so stay text."""
+            if not entry.id:
+                st.markdown("\n".join(f"- {md(b)}" for b in entry.bullets if _clean(b)))
+                return
+            stack = st.text_input("Tech stack", value=", ".join(entry.tech_stack),
+                                  key=f"edit_stack_{entry.id}_{version}", placeholder="Comma-separated",
+                                  label_visibility="collapsed") if has_stack else ""
+            bullets = st.text_area("Bullets", value="\n".join(entry.bullets), key=f"edit_bullets_{entry.id}_{version}",
+                                   height=150, placeholder="One bullet per line", label_visibility="collapsed")
+            items.append(RevisedCVItem(id=entry.id, bullets=lines(bullets),
+                                       tech_stack=[t.strip() for t in stack.split(",")] if has_stack else None))
+
+        if cv.experience:
+            preview_section("Experience")
+            for exp in cv.experience:
+                preview_entry(md(exp.title), exp.duration, md(exp.organization) or None, [] if edit else exp.bullets)
+                if edit:
+                    edit_boxes(exp, False)
+
+        if cv.projects:
+            preview_section("Projects")
+            for project in cv.projects:
+                title = md(_pretty_project_name(project.name))
+                if url := _clean(project.repo_url):
+                    href = url if re.match(r"^https?://", url) else "https://" + url
+                    title += f" &nbsp;[{'GitHub' if 'github.com' in url else 'Link'}]({href})"
+                if edit:
+                    preview_entry(title, None, None, [])
+                    edit_boxes(project, True)
+                else:
+                    tech = [md(t) for t in project.tech_stack if _clean(t)][:MAX_TECH_SHOWN]
+                    preview_entry(title, None, " · ".join(tech) or None, project.bullets)
+
+        if cv.education:
+            preview_section("Education")
+            for edu in cv.education:
+                subtitle = [md(edu.institution)] if _clean(edu.institution) else []
+                if _clean(edu.expected_graduation):
+                    subtitle.append(f"Expected graduation {md(edu.expected_graduation)}")
+                preview_entry(md(edu.degree), edu.duration, " · ".join(subtitle) or None, [], edu.description)
+
+        if cv.courses:
+            preview_section("Relevant Courses")
+            course_lines = []  # not "lines", the helper the edit boxes use
+            for course in cv.courses:
+                line = f"- **{md(course.name)}**"
+                if _clean(course.provider):
+                    line += f" — {md(course.provider)}"
+                if _clean(course.date):
+                    line += f" ({md(course.date)})"
+                course_lines.append(line)
+            st.markdown("\n".join(course_lines))
+    if edit:
+        return CVRevision(objective=objective, skills=lines(skills), items=items)
+    return None
+
+
+# --- CV revisions ---------------------------------------------------------------------
+# A note from the user edits the current CV (one AI call), or the user edits the text by hand
+# (no AI call). Each change that actually alters the CV becomes a new version; the older ones
+# are kept in cv_history for Undo.
+
+def revise_cv(request: str) -> None:
+    old = st.session_state["final_cv"]
+    inputs = {  # this run's snapshot, so profile edits made since can't mix into this CV
+        "structured_profile": StructuredProfile.model_validate(st.session_state["run_profile"]),
+        "structured_jd": StructuredJD.model_validate(st.session_state["parsed_jd"]),
+        "job_match": JobMatch.model_validate(st.session_state["job_match"]),
+        "final_cv": FinalCV.model_validate(old),
+        "mode": "cv",
+        "revision_request": request,
+    }
+    result = build_application_graph().invoke(inputs)
+    new, revision = result["final_cv"].model_dump(), result["cv_revision"]
+    save_version(new, request, revision.changes, revision.not_done)
+
+
+def save_version(new: dict, request: str, changes: list[str], not_done: list[str]) -> None:
+    """Make `new` the current CV, keeping the old one for Undo. An unchanged CV makes no new version."""
+    old = st.session_state["final_cv"]
+    applied = new != old
+    if applied:
+        st.session_state["cv_history"].append(old)
+        st.session_state["final_cv"] = new
+        st.session_state.pop("cv_pdf_bytes", None)
+    last = {"request": request, "applied": applied, "changes": changes if applied else [], "not_done": not_done}
+    st.session_state["last_revision"] = last
+    st.session_state.setdefault("revisions", []).append(last)
+
+
+def lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def stop_editing() -> None:
+    st.session_state["cv_editing"] = False
+
+
+def editable_cv_preview(version: int) -> bool:
+    """The CV preview with an Edit button that turns its text into boxes in place (no AI call).
+    Saving applies them with the same code as an AI revision. True once saved, so the caller can redraw."""
+    cv = FinalCV.model_validate(st.session_state["final_cv"])
+    if not st.session_state.get("cv_editing"):
+        st.button("✏️ Edit", on_click=lambda: st.session_state.update(cv_editing=True))
+        render_cv_preview(cv)
+        return False
+    with st.form(f"cv_edit_{version}"):
+        revision = render_cv_preview(cv, edit=True, version=version)
+        save_col, cancel_col, _ = st.columns([1, 1, 4])
+        saved = save_col.form_submit_button("Save", type="primary")
+        cancel_col.form_submit_button("Cancel", on_click=stop_editing)
+    if not saved:
+        return False
+    stop_editing()
+    save_version(apply_revision(cv, revision).model_dump(), "Manual edit", ["Edited by hand"], [])
+    return True
+
+
+def undo_revision() -> None:
+    st.session_state["final_cv"] = st.session_state["cv_history"].pop()
+    st.session_state.pop("cv_pdf_bytes", None)
+    st.session_state.pop("last_revision", None)
+    st.session_state.setdefault("revisions", []).append({"undo": True})
+
+
+def render_revision_result(last: dict) -> None:
+    if not last["applied"]:
+        st.info("No changes were made to the CV.")
+    elif last["changes"]:
+        st.success("**Changed:**\n" + "\n".join(f"- {md(c)}" for c in last["changes"]))
+    else:
+        st.success("CV updated.")
+    if last["not_done"]:
+        st.warning("**Not done:**\n" + "\n".join(f"- {md(n)}" for n in last["not_done"]))
+
+
 st.set_page_config(page_title="JobFit", page_icon="\U0001F4DD")
 st.title("JobFit")
 
@@ -462,7 +662,7 @@ with jd_tab:
                         inputs["structured_jd"] = StructuredJD.model_validate(st.session_state["parsed_jd"])
                         inputs["job_match"] = JobMatch.model_validate(st.session_state["job_match"])
                     else:
-                        for key in ("final_cv", "cv_pdf_bytes", "gap_plan"):
+                        for key in ("final_cv", "cv_pdf_bytes", "gap_plan", *REVISION_KEYS):
                             st.session_state.pop(key, None)
 
                     result = build_application_graph().invoke(inputs)
@@ -473,7 +673,8 @@ with jd_tab:
                     st.session_state["job_match"] = result["job_match"].model_dump()
                     if mode == "cv":
                         st.session_state["final_cv"] = result["final_cv"].model_dump()
-                        st.session_state.pop("cv_pdf_bytes", None)
+                        for key in ("cv_pdf_bytes", *REVISION_KEYS):  # a fresh CV starts again at version 1
+                            st.session_state.pop(key, None)
                         st.success("CV tailored.")
                     else:
                         st.session_state["gap_plan"] = result["gap_plan"].model_dump()
@@ -489,8 +690,38 @@ with jd_tab:
             render_gap_plan(GapPlan.model_validate(st.session_state["gap_plan"]))
 
         if st.session_state.get("final_cv"):
+            history = st.session_state.setdefault("cv_history", [])
+            last_revision = st.session_state.get("last_revision")
             st.subheader("Generated CV")
-            st.caption("The tailored content is under Raw data & download → Generated CV.")
+            version = f"Version {len(history) + 1}"
+            if history and last_revision and last_revision["applied"]:
+                version += f' · after "{md(textwrap.shorten(last_revision["request"], 70, placeholder="…"))}"'
+            st.caption(f"{version}. Preview of the content and layout; the PDF has the final styling.")
+            if editable_cv_preview(len(history)):
+                st.rerun()  # draw the preview again with the edited CV
+            editing = st.session_state.get("cv_editing", False)  # the AI and Undo wait until the edit is saved
+            if last_revision:
+                render_revision_result(last_revision)
+
+            with st.form("revise_form", clear_on_submit=True):
+                revision_request = st.text_area("What should change?", placeholder=REVISION_PLACEHOLDER,
+                                                help="Edits the objective, skills and the bullets and tech "
+                                                     "stacks of the items already on this CV.")
+                revise_submitted = st.form_submit_button("Apply changes", disabled=editing)
+            st.button("↩ Undo last change", on_click=undo_revision, disabled=not history or editing)
+
+            if revise_submitted:
+                if not revision_request.strip():
+                    st.warning("Write what should change first.")
+                else:
+                    try:
+                        with st.spinner("Revising your CV..."):
+                            revise_cv(revision_request.strip())
+                    except Exception as exc:
+                        st.error("Something went wrong revising this CV:")
+                        st.code(str(exc))
+                    else:
+                        st.rerun()  # the preview is drawn above the form, so draw it again with the new CV
 
             if st.button("Generate PDF"):
                 final_cv = FinalCV.model_validate(st.session_state["final_cv"])
@@ -515,6 +746,7 @@ with jd_tab:
                 "job_match": st.session_state["job_match"],
                 "gap_plan": st.session_state.get("gap_plan"),
                 "final_cv": st.session_state.get("final_cv"),
+                "revisions": st.session_state.get("revisions"),
             }
             run_filename = (f"{datetime.now():%Y%m%d_%H%M%S}_"
                             f"{safe_filename(st.session_state['parsed_jd'].get('title'), 'run')}.json")
@@ -531,7 +763,8 @@ with jd_tab:
                     ("Parsed job description", run["structured_jd"]),
                     ("Job match", run["job_match"]),
                     ("Gap plan", run["gap_plan"]),
-                    ("Generated CV", run["final_cv"]),
+                    ("Generated CV (latest version)", run["final_cv"]),
+                    ("CV revisions", run["revisions"]),
                     ("Profile used for this run", run["structured_profile"]),
                     ("Models used", run["models"]),
                 ]

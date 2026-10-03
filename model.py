@@ -187,6 +187,7 @@ class GeneratedCVContent(BaseModel):
     courses: list[str] = Field(default_factory=list)  # course ids, most relevant first
 
 class FinalCVProject(BaseModel):
+    id: str = ""            # profile id (proj_1), so a revision can find the item; never shown on the CV
     name: str
     tech_stack: list[str] = Field(default_factory=list)
     repo_url: Optional[str] = None
@@ -194,6 +195,7 @@ class FinalCVProject(BaseModel):
 
 # The CV holds dates as display text ("08.2024 – Present"), built by code from the profile.
 class FinalCVExperience(BaseModel):
+    id: str = ""            # profile id (exp_1), see FinalCVProject.id
     title: str
     organization: str
     duration: Optional[str] = None
@@ -220,3 +222,23 @@ class FinalCV(BaseModel):
     experience: list[FinalCVExperience] = Field(default_factory=list)
     education: list[FinalCVEducation] = Field(default_factory=list)  # always the full profile list, newest first
     courses: list[FinalCVCourse] = Field(default_factory=list)     # only the ones chosen for this job
+
+# --- CV revision ------------------------------------------------------------------
+# The user writes a note ("don't call me junior"); the LLM returns only what it changes,
+# and code applies that to a copy of the CV (nodes.apply_revision). null = unchanged.
+
+class RevisedCVItem(BaseModel):
+    id: str = Field(description="Id of a project or experience already on the CV, e.g. proj_1")
+    bullets: Optional[list[str]] = Field(
+        default=None, description="The item's full new bullet list; null if unchanged")
+    tech_stack: Optional[list[str]] = Field(
+        default=None, description="A project's full new tech stack; null if unchanged, and always null for experience")
+
+class CVRevision(BaseModel):
+    objective: Optional[str] = Field(default=None, description="The full new objective; null if unchanged")
+    skills: Optional[list[str]] = Field(default=None, description="The full new skills list; null if unchanged")
+    items: list[RevisedCVItem] = Field(
+        default_factory=list, description="Only the projects and experience that change")
+    changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
+    not_done: list[str] = Field(
+        default_factory=list, description="Each part of the request that was not done, and why")

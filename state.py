@@ -1,6 +1,6 @@
 from typing import Literal, TypedDict
 
-from model import FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
+from model import CVRevision, FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
 
 
 class AgentState(TypedDict, total=False):
@@ -14,5 +14,7 @@ class AgentState(TypedDict, total=False):
     structured_jd: StructuredJD            # LLM-extracted job description
     job_match: JobMatch                    # ranked items, relevant skills, missing requirements
     final_cv: FinalCV                      # tailored CV content, ready to render
+    revision_request: str                  # the user's note for changing final_cv; empty = no revision
+    cv_revision: CVRevision                # what the revision changed or refused, for the UI
     mode: Literal["cv", "recommend"]       # which branch to take after matching
     gap_plan: GapPlan                      # suggestions for closing the missing requirements

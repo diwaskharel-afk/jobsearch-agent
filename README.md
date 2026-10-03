@@ -37,14 +37,20 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
      included. Experience and education are listed newest first, as dates like
      `08.2024 – Present`. It never claims a missing skill. You can
      download the result as a PDF.
+   - **Revise the CV.** Below the preview, write what should change ("don't call me
+     junior", "add my sandbox work to the analyst project", "remove Excel from skills").
+     One LLM call edits the objective, the skills, and the bullets and tech stacks of the
+     items already on the CV; the preview then shows the new version, with what changed
+     and what was refused (e.g. a skill your profile doesn't show). Each change is a new
+     version: **Undo** goes back one, and the PDF is always made from the latest.
    - **Recommend for gaps.** Returns a prioritised plan: add-ons that extend your
      existing projects (with build steps and a preview CV bullet), small new projects,
      courses, certifications or docs, hints for experience you may have left off your
      profile, and honest advice for gaps that can't be closed quickly (degree, years
      of experience, work permit, language).
 4. **Run snapshot.** Download a JSON file of each run (parsed JD, match, CV or gap plan,
-   the profile used, and the models used) to compare output quality across prompt
-   or model changes.
+   CV revisions, the profile used, and the models used) to compare output quality across
+   prompt or model changes.
 
 The parsed JD and the match are cached per job description and profile, so switching
 between "Tailor CV" and "Recommend for gaps" on the same job doesn't repeat those
@@ -87,12 +93,13 @@ Settings are read from `.env`:
 | `MODEL_MATCH` | Model for matching the profile to the job (default `gpt-6-sol`) |
 | `MODEL_CV` | Model for writing the tailored CV (default `gpt-6-sol`) |
 | `MODEL_GAPS` | Model for the gap plan (default `gpt-6-sol`) |
+| `MODEL_REVISE` | Model for revising a CV on request (default `gpt-6-sol`) |
 
 Each task also has a fixed reasoning effort. Both the default models and the efforts are
 set in `TASK_MODELS` in `llm.py`.
 
 The simple tasks (bullets, JD parsing) use the low-cost `gpt-6-luna`. The tasks that need
-judgment and must stay truthful (match, CV, gap plan) use `gpt-6-sol`. The frontier
+judgment and must stay truthful (match, CV, gap plan, CV revision) use `gpt-6-sol`. The frontier
 `gpt-6-astra` costs 5× as much as Sol, and none of these tasks needs it.
 
 ## Architecture
@@ -102,7 +109,7 @@ Two LangGraph pipelines (`graph.py`) run over a shared `AgentState` (`state.py`)
 ```
 Profile tab:  intake_profile → fetch_readmes → format_bullets
 
-JD tab:       parse_jd → match_profile ─┬─ mode = "cv"        → generate_cv_content
+JD tab:       parse_jd → match_profile ─┬─ mode = "cv"        → generate_cv_content ─(revision note)→ revise_cv
                                         └─ mode = "recommend" → recommend_gaps
 ```
 
@@ -132,7 +139,17 @@ JD tab:       parse_jd → match_profile ─┬─ mode = "cv"        → genera
   write tailored bullets. The LLM picks experience by relevance; code keeps the top ones
   and lists them newest first (ongoing on top, then by end and start date). Names, tech
   stacks, repo URLs and dates are always copied from the saved profile, never from the LLM. The output is a `FinalCV`, which
-  `render_cv.py` turns into a PDF.
+  `render_cv.py` turns into a PDF. Each CV project and experience keeps its profile id, so a
+  revision can find its source. When a CV is passed in, the node skips itself.
+- **`revise_cv_node`** runs only when the user writes a revision note. The app passes in the
+  parsed JD, the match and the current CV, so the nodes before it skip themselves and a
+  revision costs one LLM call. The prompt shows only the profile entries of the items on the
+  CV (all their saved bullets), the requirements the profile doesn't show, the current CV
+  and the note. The LLM returns a `CVRevision` patch: only the fields that change, plus
+  `changes` and `not_done` messages for the user. `apply_revision` applies it to a copy of the
+  CV: empty values count as unchanged, ids not on the CV are ignored, bullets are capped, and
+  names, links, dates, education and courses are always kept. The app keeps earlier versions
+  for Undo, and a request that changes nothing makes no new version.
 - **`recommend_gaps_node`** shows the gaps to the LLM as `gap_1`, `gap_2`, ….
   Code then swaps those ids for the requirement text, drops suggestions that cover no
   real gap, sorts suggestions by importance and effort, and lists any gap left
@@ -156,6 +173,7 @@ profile. That keeps names and facts from being invented.
 | `github_repo.py` | Parses GitHub repo URLs and fetches and cleans a repo's README |
 | `storage.py` | Loads and saves `data/profile.json` and assigns entry ids |
 | `render_cv.py` | Renders the final CV to PDF with ReportLab |
+| `test_revise_cv.py` | Checks CV revisions without an API key (`python test_revise_cv.py`) |
 
 ## Data and privacy
 
@@ -169,3 +187,4 @@ is set) are sent to the OpenAI API for processing.
 - Multiple users (key the profile path by user id)
 - Export the tailored CV as editable text or DOCX as well as PDF
 - Suggest improvements to existing bullets based on what a job asks for
+- Let CV revisions add, remove or swap projects, experience and courses

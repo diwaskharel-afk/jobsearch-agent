@@ -1,7 +1,10 @@
 import hashlib
 
+from langgraph.graph import END
+
 from model import (
     BulletList,
+    CVRevision,
     FinalCV,
     FinalCVCourse,
     FinalCVEducation,
@@ -21,9 +24,11 @@ from github_repo import RepoFetchError, fetch_readme, parse_github_url
 from llm import extract_structured, model_for
 from storage import assign_profile_ids
 from formatting import (
+    format_cv_for_revision,
     format_gaps,
     format_jd,
     format_job_match,
+    format_missing,
     format_month,
     format_profile,
     format_range,
@@ -39,12 +44,14 @@ from prompts import (
     JD_SYSTEM_PROMPT,
     MATCH_PROFILE_SYSTEM_PROMPT,
     RECOMMEND_GAPS_SYSTEM_PROMPT,
+    REVISE_CV_SYSTEM_PROMPT,
 )
 
 MIN_SOURCE_LEN = 20
+MAX_PROFILE_BULLETS = 15
 MAX_CV_BULLETS = 5
 MAX_CV_PROJECTS = 2
-MAX_CV_EXPERIENCE = 3
+MAX_CV_EXPERIENCE = 2
 MAX_CV_COURSES = 4
 MAX_CV_SKILLS = 20
 RELEVANCE_ORDER = {"high": 0, "medium": 1, "low": 2, "none": 3}
@@ -131,18 +138,25 @@ def experience_bullets_prompt(experience: ProfileExperience) -> tuple[str, str] 
     return BULLETS_SYSTEM_PROMPT, f"Role: {experience.title} at {experience.organization}\n\n{text}"
 
 
-def refresh_bullets(item: ProfileProject | ProfileExperience, prompt: tuple[str, str] | None) -> bool:
-    """Write the item's bullets unless the exact same request wrote the ones it has. True if the LLM was called."""
+def refresh_bullets(item: ProfileProject | ProfileExperience, prompt: tuple[str, str] | None) -> int | None:
+    """Write the item's bullets unless the exact same request wrote the ones it has.
+    None if the LLM wasn't called, else how many bullets past MAX_PROFILE_BULLETS were dropped."""
     if prompt is None:
         item.bullets, item.bullets_source = [], ""
-        return False
+        return None
     system_prompt, user_text = prompt
     source = hashlib.sha256("\n\n".join((model_for("bullets"), system_prompt, user_text)).encode()).hexdigest()
     if item.bullets and item.bullets_source == source:
-        return False
-    item.bullets = extract_structured("bullets", system_prompt, user_text, BulletList).bullets[:15]
+        return None
+    bullets = extract_structured("bullets", system_prompt, user_text, BulletList).bullets
+    item.bullets = bullets[:MAX_PROFILE_BULLETS]
     item.bullets_source = source
-    return True
+    return max(len(bullets) - MAX_PROFILE_BULLETS, 0)
+
+
+def bullet_warning(name: str, dropped: int) -> str:
+    return (f"{name}: the model wrote {MAX_PROFILE_BULLETS + dropped} bullets and only the first "
+            f"{MAX_PROFILE_BULLETS} were kept. Check that nothing important is missing.")
 
 
 def format_bullets_node(state: AgentState) -> AgentState:
@@ -156,12 +170,19 @@ def format_bullets_node(state: AgentState) -> AgentState:
         prompt = project_bullets_prompt(project)
         if prompt is None and not project.description.strip() and not project.readme:
             warnings.append(f"{project.name}: no description and no readable README, so no bullets were written.")
-        if refresh_bullets(project, prompt):
+        dropped = refresh_bullets(project, prompt)
+        if dropped is not None:
             actions.append(f"wrote bullets for {project.name}")
+        if dropped:
+            warnings.append(bullet_warning(project.name, dropped))
 
     for experience in profile.experience:
-        if refresh_bullets(experience, experience_bullets_prompt(experience)):
-            actions.append(f"wrote bullets for {experience.title} at {experience.organization}")
+        name = f"{experience.title} at {experience.organization}"
+        dropped = refresh_bullets(experience, experience_bullets_prompt(experience))
+        if dropped is not None:
+            actions.append(f"wrote bullets for {name}")
+        if dropped:
+            warnings.append(bullet_warning(name, dropped))
 
     return {"structured_profile": profile, "profile_warnings": warnings, "profile_actions": actions}
 
@@ -211,6 +232,8 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     match = state.get("job_match")
     if profile is None or jd is None or match is None:
         return {}
+    if state.get("final_cv") is not None:  # revising a CV generated in an earlier run
+        return {}
 
     user_text = (
         f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
@@ -223,6 +246,7 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     projects_by_id = {p.id: p for p in profile.projects}
     final_projects = [
         FinalCVProject(
+            id=source.id,
             name=source.name,
             tech_stack=gp.tech_stack,
             repo_url=source.repo_url,
@@ -241,6 +265,7 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     ][:MAX_CV_EXPERIENCE]
     final_experience = [
         FinalCVExperience(
+            id=source.id,
             title=source.title,
             organization=source.organization,
             duration=format_range(source),
@@ -277,6 +302,68 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
 
 def route_after_match(state: AgentState) -> str:
     return "recommend_gaps" if state.get("mode") == "recommend" else "generate_cv_content"
+
+
+def route_after_cv(state: AgentState) -> str:
+    return "revise_cv" if (state.get("revision_request") or "").strip() else END
+
+
+def clean_list(values: list[str] | None) -> list[str]:
+    """Trimmed and non-empty, keeping the first spelling of each value (case-insensitive)."""
+    seen, kept = set(), []
+    for value in (v.strip() for v in values or []):
+        if value and value.lower() not in seen:
+            seen.add(value.lower())
+            kept.append(value)
+    return kept
+
+
+def apply_revision(cv: FinalCV, revision: CVRevision) -> FinalCV:
+    """A copy of the CV with the revision applied. Empty values count as unchanged, only items
+    already on the CV can change, and names, links, dates, education and courses are always kept."""
+    patches = {}
+    for item in revision.items:
+        patches.setdefault(item.id.strip().strip("[]"), item)
+
+    def patched(entry: FinalCVProject | FinalCVExperience, has_stack: bool):
+        patch = patches.get(entry.id)
+        if patch is None:
+            return entry
+        update = {}
+        if bullets := [b.strip() for b in patch.bullets or [] if b.strip()]:
+            update["bullets"] = bullets[:MAX_CV_BULLETS]
+        if has_stack and (stack := clean_list(patch.tech_stack)):
+            update["tech_stack"] = stack
+        return entry.model_copy(update=update)
+
+    return cv.model_copy(update={
+        "objective": (revision.objective or "").strip() or cv.objective,
+        "skills": clean_list(revision.skills)[:MAX_CV_SKILLS] or cv.skills,
+        "projects": [patched(p, True) for p in cv.projects],
+        "experience": [patched(e, False) for e in cv.experience],
+    })
+
+
+def revise_cv_node(state: AgentState) -> AgentState:
+    cv = state.get("final_cv")
+    profile = state.get("structured_profile")
+    jd = state.get("structured_jd")
+    match = state.get("job_match")
+    request = (state.get("revision_request") or "").strip()
+    if cv is None or profile is None or jd is None or match is None or not request:
+        return {}
+
+    # Only the CV's own items: the model can't move facts between items or add new ones.
+    on_cv = {p.id for p in cv.projects} | {e.id for e in cv.experience}
+    user_text = (
+        f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
+        f"=== CANDIDATE PROFILE ===\n{format_profile(profile, only_ids=on_cv)}\n\n"
+        f"=== NEVER CLAIM ===\n{format_missing(match) or 'Nothing.'}\n\n"
+        f"=== CURRENT CV ===\n{format_cv_for_revision(cv)}\n\n"
+        f"=== REQUEST ===\n{request}"
+    )
+    revision = extract_structured("revise", REVISE_CV_SYSTEM_PROMPT, user_text, CVRevision)
+    return {"final_cv": apply_revision(cv, revision), "cv_revision": revision}
 
 
 def recommend_gaps_node(state: AgentState) -> AgentState:

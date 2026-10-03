@@ -42,11 +42,14 @@ JD_EMPTY_REQUIREMENTS_NOTE = (
 )
 
 BULLETS_SYSTEM_PROMPT = (
-    "Turn one project or work-experience entry into 3-15 resume bullets for job applications. Each "
-    "bullet covers one concrete piece of work from the source: a feature or system built, a task "
-    "owned, a technical decision, a problem solved or a result. Split the source into separate "
-    "bullets rather than condensing it.\n\n"
+    "Turn one project or work-experience entry into 1-15 resume bullets for job applications: as "
+    "many as the source has distinct pieces of work, never padded. Each bullet covers one concrete "
+    "piece of work from the source: a feature or system built, a task owned, a technical decision, a "
+    "problem solved or a result. Split the source into separate bullets rather than condensing it, "
+    "but never write more than 15: if the source has more, group related work so every important "
+    "piece of work and every named technology still appears.\n\n"
     "Rules:\n"
+    "- Put the most substantial work first.\n"
     "- Start each bullet with an action verb (Built, Designed, Automated, Led, ...).\n"
     "- Name the technologies, tools and systems used, so the bullets can be matched against a job's "
     "required skills.\n"
@@ -64,7 +67,7 @@ BULLETS_README_NOTE = (
     "- Take bullets from what the project does and how it is built: features, architecture, data flow, "
     "integrations, models or algorithms, deployment, testing, and the technologies it uses.\n"
     "- READMEs often list many small features. Group closely related ones into one bullet so the "
-    "bullets cover the whole project, most substantial work first.\n"
+    "bullets cover the whole project.\n"
     "- Leave out install and usage steps, commands, configuration values, folder listings, licence, "
     "contributing notes and credits. A tool that appears only in setup steps (pip, npm, git clone, an "
     "editor) is not part of the project's stack.\n"
@@ -131,6 +134,34 @@ CV_CONTENT_SYSTEM_PROMPT = (
     "lists as missing.\n"
     "- Leave out items with relevance none.\n"
     "- Ids like proj_1 go only in the id fields, never in the objective, skills or bullets."
+)
+
+REVISE_CV_SYSTEM_PROMPT = (
+    "You edit a candidate's tailored CV on their request. The input has a JOB DESCRIPTION, the "
+    "CANDIDATE PROFILE entries of the items on the CV (each with an id in square brackets, e.g. "
+    "[proj_1], and all its saved bullets), a NEVER CLAIM list of job requirements the profile doesn't "
+    "show, the CURRENT CV and the candidate's REQUEST.\n\n"
+    "Return only what the request changes:\n"
+    "- objective: the full new objective, or null if unchanged. 2-3 sentences in CV style, without "
+    "'I' or 'my'.\n"
+    "- skills: the full new skills list, or null if unchanged. Short names of 1-3 words, each once.\n"
+    "- items: one entry per changed project or experience, by its id. bullets is the item's full new "
+    "list of 3-5 bullets, or null if unchanged. tech_stack is a project's full new list of 4-6 tools, "
+    "or null if unchanged; always null for experience. Leave out items the request doesn't change.\n"
+    "- changes: one short line per change you made, naming items by name.\n"
+    "- not_done: each part of the request you didn't do, and why, in a sentence the candidate can "
+    "act on.\n\n"
+    "Rules:\n"
+    "- Change nothing the request doesn't ask for. Keep untouched bullets word for word.\n"
+    "- Every fact must come from that item's own profile entry or be stated in the request. Never "
+    "invent a tool, number or result. If a fact comes only from the request, say so in changes and "
+    "suggest adding it to the profile.\n"
+    "- Never claim anything in NEVER CLAIM unless the request states it as a fact about the "
+    "candidate. Asking to add it is not stating it.\n"
+    "- You can't add, remove or swap projects, experience, courses or education, or change names, "
+    "links or dates: put such requests in not_done.\n"
+    "- When an item already has 5 bullets and one is added, drop the one least relevant to this job.\n"
+    "- Ids like proj_1 go only in the id fields."
 )
 
 RECOMMEND_GAPS_SYSTEM_PROMPT = (
