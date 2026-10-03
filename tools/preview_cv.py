@@ -1,41 +1,27 @@
 """Show the CV preview of a saved run log in the browser, without running the pipeline.
 
-    streamlit run test_preview_cv.py                                  # pick a run in the sidebar
-    streamlit run test_preview_cv.py -- TestRunJson/20261001_143244_AI_Solution_Architect.json
+    streamlit run tools/preview_cv.py                                  # pick a run in the sidebar
+    streamlit run tools/preview_cv.py -- TestRunJson/20261001_143244_AI_Solution_Architect.json
 
-Testing only: lists the run logs in TestRunJson/ and the project folder (or takes an uploaded
+Dev tool: lists the run logs in TestRunJson/ and the project folder (or takes an uploaded
 one), and draws its final_cv with the same render_cv_preview the app uses, plus the PDF.
 """
-import ast
 import sys
 import tempfile
 from pathlib import Path
 
 import streamlit as st
 
-from model import FinalCV
-from render_cv import render_cv_pdf
-from test_render_cv import load_final_cv
+PROJECT_DIR = Path(__file__).resolve().parent.parent  # the repo root
+sys.path.insert(0, str(PROJECT_DIR))  # so `jobfit` imports when this file is run directly
 
-PROJECT_DIR = Path(__file__).parent
+from jobfit.models import FinalCV
+from jobfit.render_cv import render_cv_pdf
+from jobfit.ui.common import safe_filename
+from jobfit.ui.cv_preview import render_cv_preview
+from render_run_pdf import load_final_cv
+
 RUN_DIRS = (PROJECT_DIR / "TestRunJson", PROJECT_DIR)
-
-
-def app_helpers() -> dict:
-    """The imports, constants and functions of streamlit_app.py, without running its page.
-
-    Importing streamlit_app would draw the whole app, so only its definitions are executed.
-    """
-    path = PROJECT_DIR / "streamlit_app.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    tree.body = [
-        node for node in tree.body
-        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef))
-        or (isinstance(node, ast.Assign) and all(isinstance(t, ast.Name) and t.id.isupper() for t in node.targets))
-    ]
-    namespace = {"__name__": "streamlit_app_helpers"}
-    exec(compile(tree, str(path), "exec"), namespace)
-    return namespace
 
 
 def saved_runs() -> list[Path]:
@@ -85,14 +71,13 @@ st.caption(f"Run: {upload.name if upload is not None else run_path.name}  ·  "
            f"{len(cv.skills)} skills, {len(cv.experience)} experience, {len(cv.projects)} projects, "
            f"{len(cv.education)} education, {len(cv.courses)} courses")
 
-helpers = app_helpers()
 st.subheader("Generated CV")
-helpers["render_cv_preview"](cv)
+render_cv_preview(cv)
 
 st.download_button(
     "Download CV (PDF)",
     data=render_cv_pdf(cv),
-    file_name=f"{helpers['safe_filename'](cv.name, 'cv')}_cv.pdf",
+    file_name=f"{safe_filename(cv.name, 'cv')}_cv.pdf",
     mime="application/pdf",
 )
 with st.expander("final_cv (JSON)"):

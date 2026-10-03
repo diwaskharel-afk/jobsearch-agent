@@ -2,7 +2,7 @@ import hashlib
 
 from langgraph.graph import END
 
-from model import (
+from jobfit.models import (
     BulletList,
     CVRevision,
     FinalCV,
@@ -19,11 +19,11 @@ from model import (
     StructuredJD,
     StructuredProfile,
 )
-from state import AgentState
-from github_repo import RepoFetchError, fetch_readme, parse_github_url
-from llm import extract_structured, model_for
-from storage import assign_profile_ids
-from formatting import (
+from jobfit.state import AgentState
+from jobfit.github_repo import RepoFetchError, fetch_readme, parse_github_url
+from jobfit.llm import extract_structured, model_for
+from jobfit.storage import assign_profile_ids
+from jobfit.formatting import (
     format_cv_for_revision,
     format_gaps,
     format_jd,
@@ -36,7 +36,7 @@ from formatting import (
     item_names,
     recency_key,
 )
-from prompts import (
+from jobfit.prompts import (
     BULLETS_README_NOTE,
     BULLETS_SYSTEM_PROMPT,
     CV_CONTENT_SYSTEM_PROMPT,

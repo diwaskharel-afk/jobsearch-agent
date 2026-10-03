@@ -1,4 +1,4 @@
-from model import DatedRange, FinalCV, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+from jobfit.models import DatedRange, FinalCV, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
 
 
 def format_month(year_month: str | None) -> str:

@@ -19,7 +19,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from model import FinalCV
+from jobfit.models import FinalCV
 
 # --- Look and feel ---------------------------------------------------------------
 

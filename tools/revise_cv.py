@@ -1,15 +1,14 @@
 """Revise the CV of a saved run log with the real LLM, without running the rest of the pipeline.
 
-    streamlit run test_revise_cv.py                                  # pick a run in the sidebar
-    streamlit run test_revise_cv.py -- TestRunJson/20261002_195614_Junior_Data_Analyst.json
+    streamlit run tools/revise_cv.py                                  # pick a run in the sidebar
+    streamlit run tools/revise_cv.py -- TestRunJson/20261002_195614_Junior_Data_Analyst.json
 
-Testing only (needs the API key in .env): loads a run's profile, job, match and final_cv into
+Dev tool (needs the API key in .env): loads a run's profile, job, match and final_cv into
 the app's session state and revises it with the app's own revise_cv, so every request goes
 through the real graph and model. After each revision it shows what the model saw and
 returned, a before/after diff and a few automatic checks. The app's Edit button on the preview is
 here too, with the same report, so you can check a hand edit makes no LLM call.
 """
-import ast
 import json
 import sys
 import tempfile
@@ -19,33 +18,26 @@ from pathlib import Path
 
 import streamlit as st
 
-import nodes
-from llm import TASK_MODELS, model_for
-from model import FinalCV, StructuredProfile
-from render_cv import render_cv_pdf
-from test_render_cv import load_final_cv
+PROJECT_DIR = Path(__file__).resolve().parent.parent  # the repo root
+sys.path.insert(0, str(PROJECT_DIR))  # so `jobfit` imports when this file is run directly
 
-PROJECT_DIR = Path(__file__).parent
+from jobfit import nodes
+from jobfit.llm import TASK_MODELS, model_for
+from jobfit.models import FinalCV, StructuredProfile
+from jobfit.render_cv import render_cv_pdf
+from jobfit.ui.common import md, safe_filename
+from jobfit.ui.cv_revisions import (
+    REVISION_PLACEHOLDER,
+    editable_cv_preview,
+    render_revision_result,
+    revise_cv,
+    undo_revision,
+)
+from render_run_pdf import load_final_cv
+
 RUN_DIRS = (PROJECT_DIR / "TestRunJson", PROJECT_DIR)
 APP_KEYS = ("final_cv", "cv_history", "last_revision", "revisions", "cv_pdf_bytes", "cv_editing",
             "run_profile", "parsed_jd", "job_match")  # what the app's revise_cv and editor read and write
-
-
-def app_helpers() -> dict:
-    """The imports, constants and functions of streamlit_app.py, without running its page.
-
-    Importing streamlit_app would draw the whole app, so only its definitions are executed.
-    """
-    path = PROJECT_DIR / "streamlit_app.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    tree.body = [
-        node for node in tree.body
-        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef))
-        or (isinstance(node, ast.Assign) and all(isinstance(t, ast.Name) and t.id.isupper() for t in node.targets))
-    ]
-    namespace = {"__name__": "streamlit_app_helpers"}
-    exec(compile(tree, str(path), "exec"), namespace)
-    return namespace
 
 
 def saved_runs() -> list[Path]:
@@ -54,7 +46,7 @@ def saved_runs() -> list[Path]:
 
 
 def load_run(path: Path) -> tuple[dict, FinalCV]:
-    """The whole log, plus its final_cv checked (and old-log fixed up) the way test_render_cv does."""
+    """The whole log, plus its final_cv checked (and old-log fixed up) the way render_run_pdf does."""
     run = json.loads(path.read_text(encoding="utf-8"))
     missing = [key for key in ("structured_profile", "structured_jd", "job_match") if not run.get(key)]
     if missing:
@@ -214,8 +206,7 @@ def run_checks(before: dict, after: dict, calls: list[dict], request: str) -> li
 
 # --- Report -----------------------------------------------------------------------------
 
-def render_diff(helpers: dict, before: dict, after: dict) -> None:
-    md = helpers["md"]
+def render_diff(before: dict, after: dict) -> None:
     old, new = FinalCV.model_validate(before), FinalCV.model_validate(after)
     if old == new:
         st.caption("The CV didn't change.")
@@ -244,11 +235,11 @@ def render_diff(helpers: dict, before: dict, after: dict) -> None:
             side_by_side(f"{label} [{o.id}]: tech stack", [", ".join(o.tech_stack)], [", ".join(n.tech_stack)])
 
 
-def render_report(helpers: dict, report: dict) -> None:
+def render_report(report: dict) -> None:
     icons = {True: "✅", False: "❌", None: "⚠️"}
-    st.markdown("\n".join(f"- {icons[ok]} {helpers['md'](what)}" for ok, what in report["checks"]))
+    st.markdown("\n".join(f"- {icons[ok]} {md(what)}" for ok, what in report["checks"]))
     st.caption(f"{report['seconds']} s · " + ", ".join(f"{c['task']}: {c['model']}" for c in report["calls"]))
-    render_diff(helpers, report["before"], report["after"])
+    render_diff(report["before"], report["after"])
     for call in report["calls"]:
         with st.expander(f"What the model saw ({call['task']})"):
             st.code(call["user_text"], language=None)
@@ -258,7 +249,6 @@ def render_report(helpers: dict, report: dict) -> None:
 
 st.set_page_config(page_title="CV revision test", page_icon="✏️", layout="wide")
 st.title("CV revision test")
-helpers = app_helpers()
 
 runs = saved_runs()
 cli_run = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None
@@ -304,16 +294,16 @@ jd = run["structured_jd"]
 missing = run["job_match"].get("missing", [])
 with st.sidebar:
     with st.expander(f"NEVER CLAIM ({len(missing)})"):
-        st.markdown("\n".join(f"- *{m['importance']}*: {helpers['md'](m['requirement'])}" for m in missing)
+        st.markdown("\n".join(f"- *{m['importance']}*: {md(m['requirement'])}" for m in missing)
                     or "Nothing.")
 
 st.caption(f"Run: {upload.name if upload is not None else run_path.name}  ·  Job: "
-           f"{helpers['md'](jd.get('title')) or '?'}" + (f" at {helpers['md'](jd['company'])}" if jd.get("company") else ""))
+           f"{md(jd.get('title')) or '?'}" + (f" at {md(jd['company'])}" if jd.get("company") else ""))
 filled, unmatched = st.session_state["id_notes"]
 if filled:
-    st.caption("This log predates CV item ids; matched from the profile: " + helpers["md"]("; ".join(filled)))
+    st.caption("This log predates CV item ids; matched from the profile: " + md("; ".join(filled)))
 if unmatched:
-    st.warning("No profile entry found for: " + helpers["md"]("; ".join(unmatched))
+    st.warning("No profile entry found for: " + md("; ".join(unmatched))
                + ". Revisions can't change these items.")
 
 cv_col, revise_col = st.columns([3, 2], gap="large")
@@ -321,7 +311,7 @@ cv_col, revise_col = st.columns([3, 2], gap="large")
 with cv_col:
     history = st.session_state["cv_history"]
     st.subheader(f"CV · version {len(history) + 1}")
-    if record(MANUAL, lambda: helpers["editable_cv_preview"](len(history))):
+    if record(MANUAL, lambda: editable_cv_preview(len(history))):
         st.rerun()  # draw the preview again with the edited CV
 editing = st.session_state.get("cv_editing", False)  # the LLM and Undo wait until the edit is saved
 
@@ -331,10 +321,10 @@ with revise_col:
     st.selectbox("Example request", examples, index=None, key="example", placeholder="Pick one to fill the box…",
                  on_change=lambda: st.session_state.update(
                      request=(st.session_state["example"] or "").split("  [")[0]))
-    request = st.text_area("What should change?", key="request", placeholder=helpers["REVISION_PLACEHOLDER"],
+    request = st.text_area("What should change?", key="request", placeholder=REVISION_PLACEHOLDER,
                            height=110)
     revise_clicked = st.button("Revise with the LLM", type="primary", disabled=editing)
-    st.button("↩ Undo last change", on_click=helpers["undo_revision"], disabled=not history or editing)
+    st.button("↩ Undo last change", on_click=undo_revision, disabled=not history or editing)
 
     if revise_clicked:
         if not request.strip():
@@ -342,7 +332,7 @@ with revise_col:
         else:
             try:
                 with st.spinner(f"Revising with {model_for('revise')}..."):
-                    record(request.strip(), lambda: helpers["revise_cv"](request.strip()))
+                    record(request.strip(), lambda: revise_cv(request.strip()))
             except Exception as exc:
                 st.error("The revision failed:")
                 st.code(str(exc))
@@ -350,26 +340,26 @@ with revise_col:
                 st.rerun()  # the preview is drawn left of the form, so draw it again with the new CV
 
     if last := st.session_state.get("last_revision"):
-        helpers["render_revision_result"](last)
+        render_revision_result(last)
 
     reports = st.session_state["reports"]
     if reports:
         st.subheader("Report")
-        st.markdown(f"**Request:** {helpers['md'](reports[-1]['request'])}")
-        render_report(helpers, reports[-1])
+        st.markdown(f"**Request:** {md(reports[-1]['request'])}")
+        render_report(reports[-1])
     for number, report in reversed(list(enumerate(reports[:-1], start=1))):
         with st.expander(f"Revision {number}: {report['request'][:70]}"):
-            render_report(helpers, report)
+            render_report(report)
 
     st.divider()
     final_cv = FinalCV.model_validate(st.session_state["final_cv"])
     st.download_button("Download CV (PDF)", data=render_cv_pdf(final_cv),
-                       file_name=f"{helpers['safe_filename'](final_cv.name, 'cv')}_cv.pdf", mime="application/pdf")
+                       file_name=f"{safe_filename(final_cv.name, 'cv')}_cv.pdf", mime="application/pdf")
     revised_run = {  # same shape as the app's run download, with this session's revisions
         **run, "saved_at": datetime.now().isoformat(timespec="seconds"),
         "models": {task: model_for(task) for task in TASK_MODELS},
         "final_cv": st.session_state["final_cv"], "revisions": st.session_state.get("revisions"),
     }
     st.download_button("Download run (JSON)", data=json.dumps(revised_run, indent=2, ensure_ascii=False),
-                       file_name=f"{datetime.now():%Y%m%d_%H%M%S}_{helpers['safe_filename'](jd.get('title'), 'run')}.json",
+                       file_name=f"{datetime.now():%Y%m%d_%H%M%S}_{safe_filename(jd.get('title'), 'run')}.json",
                        mime="application/json")
