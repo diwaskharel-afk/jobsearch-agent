@@ -73,7 +73,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env   # then put your OPENAI_API_KEY in .env
-streamlit run streamlit_app.py
+streamlit run app.py
 ```
 
 Open the **Profile** tab, fill it out and click **Save profile**. Then go to the
@@ -96,7 +96,7 @@ Settings are read from `.env`:
 | `MODEL_REVISE` | Model for revising a CV on request (default `gpt-6-sol`) |
 
 Each task also has a fixed reasoning effort. Both the default models and the efforts are
-set in `TASK_MODELS` in `llm.py`.
+set in `TASK_MODELS` in `jobfit/llm.py`.
 
 The simple tasks (bullets, JD parsing) use the low-cost `gpt-6-luna`. The tasks that need
 judgment and must stay truthful (match, CV, gap plan, CV revision) use `gpt-6-sol`. The frontier
@@ -104,7 +104,7 @@ judgment and must stay truthful (match, CV, gap plan, CV revision) use `gpt-6-so
 
 ## Architecture
 
-Two LangGraph pipelines (`graph.py`) run over a shared `AgentState` (`state.py`):
+Two LangGraph pipelines (`jobfit/graph.py`) run over a shared `AgentState` (`jobfit/state.py`):
 
 ```
 Profile tab:  intake_profile → fetch_readmes → format_bullets
@@ -160,20 +160,41 @@ profile. That keeps names and facts from being invented.
 
 ## Project structure
 
-| File | Responsibility |
-|---|---|
-| `streamlit_app.py` | UI: profile form, job description tab, results, downloads |
-| `graph.py` | LangGraph pipeline definitions and the CV / gaps branch |
-| `state.py` | Shared `AgentState` passed through each graph |
-| `nodes.py` | Graph node implementations |
-| `model.py` | Pydantic schemas: profile, JD, match, gap plan, CV |
-| `prompts.py` | LLM system prompts |
-| `llm.py` | Structured-output LLM calls and the model chosen for each task |
-| `formatting.py` | Turns the profile, JD and match into plain text for prompts |
-| `github_repo.py` | Parses GitHub repo URLs and fetches and cleans a repo's README |
-| `storage.py` | Loads and saves `data/profile.json` and assigns entry ids |
-| `render_cv.py` | Renders the final CV to PDF with ReportLab |
-| `test_revise_cv.py` | Checks CV revisions without an API key (`python test_revise_cv.py`) |
+```
+app.py                  Streamlit entry point: page setup and the two tabs
+jobfit/                 Core package
+├── graph.py            LangGraph pipeline definitions and the CV / gaps branch
+├── state.py            Shared AgentState passed through each graph
+├── nodes.py            Graph node implementations
+├── models.py           Pydantic schemas: profile, JD, match, gap plan, CV
+├── prompts.py          LLM system prompts
+├── llm.py              Structured-output LLM calls and the model chosen for each task
+├── formatting.py       Turns the profile, JD and match into plain text for prompts
+├── github_repo.py      Parses GitHub repo URLs and fetches and cleans a repo's README
+├── storage.py          Loads and saves data/profile.json and assigns entry ids
+├── render_cv.py        Renders the final CV to PDF with ReportLab
+└── ui/                 Streamlit UI
+    ├── profile_tab.py      Profile tab: form, checks, save
+    ├── profile_fields.py   Entry cards and the fields of each kind of entry
+    ├── dates.py            Month + year pickers, date badges and date checks
+    ├── job_tab.py          Job Description tab: run, results, CV, run snapshot
+    ├── job_results.py      Job match and gap plan views
+    ├── cv_preview.py       On-screen CV preview, with in-place edit boxes
+    ├── cv_revisions.py     CV versions: AI revisions, hand edits, Undo
+    └── common.py           Small text helpers
+tools/                  Dev tools that work from a saved run log (Download run JSON)
+├── preview_cv.py       Show a run's CV preview and PDF
+├── revise_cv.py        Revise a run's CV with the real LLM and check the result
+└── render_run_pdf.py   Render a run's CV to PDF from the command line
+```
+
+The tools read run logs from `TestRunJson/` (git-ignored) or the repo root:
+
+```bash
+streamlit run tools/preview_cv.py
+streamlit run tools/revise_cv.py      # needs OPENAI_API_KEY; each revision is one LLM call
+python tools/render_run_pdf.py TestRunJson/<run>.json
+```
 
 ## Data and privacy
 

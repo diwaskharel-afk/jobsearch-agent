@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from model import StructuredProfile
+from jobfit.models import StructuredProfile
 
 # Single-user local app for now: one fixed file. Multi-user later just means
 # keying this path by user id/email instead — no other structural change needed.

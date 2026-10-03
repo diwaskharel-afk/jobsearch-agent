@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 
-from state import AgentState
-from nodes import (
+from jobfit.state import AgentState
+from jobfit.nodes import (
     fetch_readmes_node,
     format_bullets_node,
     generate_cv_content_node,

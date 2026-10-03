@@ -1,20 +1,21 @@
 """Render the CV stored in a saved run log, without running the pipeline.
 
-    python test_render_cv.py                              # newest *.json run in the project folder
-    python test_render_cv.py 20260928_163903_Applied_AI_Engineer.json
-    python test_render_cv.py run.json -o out.pdf
+    python tools/render_run_pdf.py                              # newest *.json run in the project folder
+    python tools/render_run_pdf.py 20260928_163903_Applied_AI_Engineer.json
+    python tools/render_run_pdf.py run.json -o out.pdf
 
-Testing only: reads the log, validates its final_cv and writes the PDF next to it.
+Dev tool: reads the log, validates its final_cv and writes the PDF next to it.
 """
 import argparse
 import json
 import sys
 from pathlib import Path
 
-from model import FinalCV
-from render_cv import render_cv_pdf
+PROJECT_DIR = Path(__file__).resolve().parent.parent  # the repo root
+sys.path.insert(0, str(PROJECT_DIR))  # so `jobfit` imports when this file is run directly
 
-PROJECT_DIR = Path(__file__).parent
+from jobfit.models import FinalCV
+from jobfit.render_cv import render_cv_pdf
 
 
 def latest_run() -> Path:

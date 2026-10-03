@@ -1,6 +1,6 @@
 from typing import Literal, TypedDict
 
-from model import CVRevision, FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
+from jobfit.models import CVRevision, FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
 
 
 class AgentState(TypedDict, total=False):
