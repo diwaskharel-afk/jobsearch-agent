@@ -4,6 +4,7 @@ from jobfit.models import (
     CoverLetter,
     CoverLetterRevision,
     CVRevision,
+    CVSwap,
     FinalCV,
     GapPlan,
     JobMatch,
@@ -25,6 +26,9 @@ class AgentState(TypedDict, total=False):
     final_cv: FinalCV                      # tailored CV content, ready to render
     revision_request: str                  # the user's note for changing final_cv; empty = no revision
     cv_revision: CVRevision                # what the revision changed or refused, for the UI
+    swap_out: str                          # id of an item on final_cv to replace; empty = no swap
+    swap_in: str                           # id of the profile item of the same kind that takes its place
+    cv_swap: CVSwap                        # what the swap's LLM call wrote, for the UI
     # Which branch to take after matching; "analyse" stops after the match.
     mode: Literal["analyse", "cv", "recommend", "cover_letter"]
     gap_plan: GapPlan                      # suggestions for closing the missing requirements

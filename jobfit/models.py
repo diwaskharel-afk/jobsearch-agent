@@ -208,6 +208,7 @@ class FinalCVEducation(BaseModel):
     expected_graduation: Optional[str] = None  # "06.2027" while ongoing
 
 class FinalCVCourse(BaseModel):
+    id: str = ""            # profile id (course_1), so a swap can find the item; never shown on the CV
     name: str
     provider: Optional[str] = None
     date: Optional[str] = None
@@ -241,6 +242,20 @@ class CVRevision(BaseModel):
     changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
     not_done: list[str] = Field(
         default_factory=list, description="Each part of the request that was not done, and why")
+
+# --- Swapping an item -------------------------------------------------------------
+# The user picks which profile item replaces which on the CV, and code swaps them
+# (nodes.swap_cv_item_node). The LLM only writes the new item's content, and fixes the
+# objective or skills when the swap leaves them out of step with the CV. null = unchanged.
+
+class CVSwap(BaseModel):
+    bullets: list[str] = Field(default_factory=list, description="3-5 tailored bullets for the new item")
+    tech_stack: list[str] = Field(
+        default_factory=list, description="A new project's 4-6 tools from its own text; empty for experience")
+    objective: Optional[str] = Field(default=None, description="The full new objective; null if unchanged")
+    skills: Optional[list[str]] = Field(default=None, description="The full new skills list; null if unchanged")
+    changes: list[str] = Field(
+        default_factory=list, description="One short line per change to the objective or skills, for the candidate")
 
 # --- Cover letter -----------------------------------------------------------------
 # The LLM writes only the body. Name, contact, date, company, greeting and sign-off come

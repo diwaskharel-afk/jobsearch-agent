@@ -7,8 +7,8 @@ import streamlit as st
 
 from jobfit.graph import build_application_graph
 from jobfit.llm import TASK_MODELS, model_for
-from jobfit.models import JobMatch, StructuredJD, StructuredProfile
-from jobfit.nodes import pick_for_cv, pick_for_letter
+from jobfit.models import FinalCV, JobMatch, StructuredJD, StructuredProfile
+from jobfit.nodes import cv_item_ids, pick_for_cv, pick_for_letter
 from jobfit.ui import versions
 
 JOB_KEYS = ("match_key", "jd_input", "run_profile", "parsed_jd", "job_match", "gap_plan")
@@ -52,9 +52,12 @@ def rerun_match() -> None:
 
 
 def picks() -> dict[str, list[str]]:
-    """Ids of the items each document is written from, as picked from the current ranking."""
+    """Ids of the items each document is written from: the CV's own items once it's written (swaps
+    change them), otherwise those picked from the current ranking."""
     match = JobMatch.model_validate(st.session_state["job_match"])
-    return {"cv": pick_for_cv(match), "letter": pick_for_letter(match)}
+    cv = versions.current("cv")
+    return {"cv": cv_item_ids(FinalCV.model_validate(cv)) if cv else pick_for_cv(match),
+            "letter": pick_for_letter(match)}
 
 
 def run_inputs(mode: str, **extra) -> dict:

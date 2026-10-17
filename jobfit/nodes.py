@@ -5,9 +5,11 @@ from langgraph.graph import END
 
 from jobfit.models import (
     BulletList,
+    CourseEntry,
     CoverLetter,
     CoverLetterRevision,
     CVRevision,
+    CVSwap,
     FinalCV,
     FinalCVCourse,
     FinalCVEducation,
@@ -15,6 +17,7 @@ from jobfit.models import (
     FinalCVProject,
     GapPlan,
     GeneratedCVContent,
+    GeneratedCVItem,
     GeneratedCoverLetter,
     JobMatch,
     ProfileExperience,
@@ -53,6 +56,7 @@ from jobfit.prompts import (
     RECOMMEND_GAPS_SYSTEM_PROMPT,
     REVISE_COVER_LETTER_SYSTEM_PROMPT,
     REVISE_CV_SYSTEM_PROMPT,
+    SWAP_CV_ITEM_SYSTEM_PROMPT,
 )
 
 MIN_SOURCE_LEN = 20
@@ -259,6 +263,39 @@ def pick_for_letter(match: JobMatch) -> list[str]:
     return [item.id for item in match.items if item.relevance in LETTER_RELEVANCE]
 
 
+# A CV item is built from its profile entry: names, links and dates always come from there.
+# `written` is what the LLM wrote for it; without it (or without bullets) the profile bullets are used.
+
+def cv_project(source: ProfileProject, written: GeneratedCVItem | None) -> FinalCVProject:
+    return FinalCVProject(
+        id=source.id,
+        name=source.name,
+        tech_stack=written.tech_stack if written else [],
+        repo_url=source.repo_url,
+        bullets=((written.bullets if written else []) or source.bullets)[:MAX_CV_BULLETS],
+    )
+
+
+def cv_experience(source: ProfileExperience, written: GeneratedCVItem | None) -> FinalCVExperience:
+    return FinalCVExperience(
+        id=source.id,
+        title=source.title,
+        organization=source.organization,
+        duration=format_range(source),
+        bullets=((written.bullets if written else []) or source.bullets or source.responsibilities)[:MAX_CV_BULLETS],
+    )
+
+
+def cv_course(source: CourseEntry) -> FinalCVCourse:
+    return FinalCVCourse(id=source.id, name=source.name, provider=source.provider,
+                         date=format_month(source.date) or None)
+
+
+def cv_item_ids(cv: FinalCV) -> list[str]:
+    """Profile ids of the projects, experience and courses on the CV, in CV order."""
+    return [entry.id for entry in cv.experience + cv.projects + cv.courses if entry.id]
+
+
 def generate_cv_content_node(state: AgentState) -> AgentState:
     profile = state.get("structured_profile")
     jd = state.get("structured_jd")
@@ -283,39 +320,17 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     for item in generated.projects + generated.experience:
         written.setdefault(item.id.strip().strip("[]"), item)
     projects_by_id = {p.id: p for p in profile.projects}
-    final_projects = [
-        FinalCVProject(
-            id=source.id,
-            name=source.name,
-            tech_stack=written[source.id].tech_stack if source.id in written else [],
-            repo_url=source.repo_url,
-            bullets=(written[source.id].bullets if source.id in written else source.bullets)[:MAX_CV_BULLETS],
-        )
-        for item_id in picked
-        if (source := projects_by_id.get(item_id))
-    ]
+    final_projects = [cv_project(source, written.get(source.id))
+                      for item_id in picked if (source := projects_by_id.get(item_id))]
 
     # Picked by relevance, listed newest first.
     experience_by_id = {e.id: e for e in profile.experience}
     picked_experience = [source for item_id in picked if (source := experience_by_id.get(item_id))]
-    final_experience = [
-        FinalCVExperience(
-            id=source.id,
-            title=source.title,
-            organization=source.organization,
-            duration=format_range(source),
-            bullets=(written[source.id].bullets if source.id in written
-                     else source.bullets or source.responsibilities)[:MAX_CV_BULLETS],
-        )
-        for source in sorted(picked_experience, key=recency_key, reverse=True)
-    ]
+    final_experience = [cv_experience(source, written.get(source.id))
+                        for source in sorted(picked_experience, key=recency_key, reverse=True)]
 
     courses_by_id = {c.id: c for c in profile.courses}
-    final_courses = [
-        FinalCVCourse(name=source.name, provider=source.provider, date=format_month(source.date) or None)
-        for item_id in picked
-        if (source := courses_by_id.get(item_id))
-    ]
+    final_courses = [cv_course(source) for item_id in picked if (source := courses_by_id.get(item_id))]
 
     final_cv = FinalCV(
         name=profile.name,
@@ -341,6 +356,8 @@ def route_after_match(state: AgentState) -> str:
 
 
 def route_after_cv(state: AgentState) -> str:
+    if (state.get("swap_out") or "").strip():
+        return "swap_cv_item"
     return "revise_cv" if (state.get("revision_request") or "").strip() else END
 
 
@@ -400,6 +417,64 @@ def revise_cv_node(state: AgentState) -> AgentState:
     )
     revision = extract_structured("revise", REVISE_CV_SYSTEM_PROMPT, user_text, CVRevision)
     return {"final_cv": apply_revision(cv, revision), "cv_revision": revision}
+
+
+def swap_candidates(cv: FinalCV, item_id: str, match: JobMatch) -> list[RankedItem]:
+    """Profile items that can take item_id's place: the same kind, not on the CV, best-ranked first."""
+    kind = item_id.split("_")[0]
+    on_cv = set(cv_item_ids(cv))
+    return [item for item in match.items if item.id.split("_")[0] == kind and item.id not in on_cv]
+
+
+def swap_cv_item_node(state: AgentState) -> AgentState:
+    """Replace one item on the CV with another of the same kind from the profile. The user chose
+    both, and code swaps them; for a project or experience, the LLM writes the new item's bullets
+    (and stack) and keeps the objective and skills in step. A course has no written text, so no LLM."""
+    cv = state.get("final_cv")
+    profile = state.get("structured_profile")
+    jd = state.get("structured_jd")
+    match = state.get("job_match")
+    old_id = (state.get("swap_out") or "").strip()
+    new_id = (state.get("swap_in") or "").strip()
+    if cv is None or profile is None or jd is None or match is None or not old_id:
+        return {}
+    if old_id not in cv_item_ids(cv):
+        raise ValueError(f"{old_id} is not on the CV")
+    if new_id not in {item.id for item in swap_candidates(cv, old_id, match)}:
+        raise ValueError(f"{new_id} can't replace {old_id}: it must be a profile item of the same kind, not on the CV")
+
+    names = item_names(profile)
+    swapped = f"Swapped {names.get(old_id, old_id)} for {names[new_id]}"
+    if new_id.startswith("course_"):
+        source = next(c for c in profile.courses if c.id == new_id)
+        courses = [cv_course(source) if c.id == old_id else c for c in cv.courses]
+        return {"final_cv": cv.model_copy(update={"courses": courses}), "cv_swap": CVSwap(changes=[swapped])}
+
+    user_text = (
+        f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
+        f"=== NEW ITEM ===\n{format_profile(profile, only_ids={new_id})}\n\n"
+        f"=== MATCH ===\n{format_job_match(match, only_ids={new_id})}\n\n"
+        f"=== CURRENT CV ===\n{format_cv_for_revision(cv)}\n\n"
+        f"=== SWAP ===\nReplace [{old_id}] {names.get(old_id, old_id)} with [{new_id}] {names[new_id]}."
+    )
+    swap = extract_structured("swap", SWAP_CV_ITEM_SYSTEM_PROMPT, user_text, CVSwap)
+    written = GeneratedCVItem(id=new_id, tech_stack=clean_list(swap.tech_stack),
+                              bullets=[b.strip() for b in swap.bullets if b.strip()])
+
+    update = {
+        "objective": (swap.objective or "").strip() or cv.objective,
+        "skills": clean_list(swap.skills)[:MAX_CV_SKILLS] or cv.skills,
+    }
+    if new_id.startswith("proj_"):  # takes the old project's place
+        source = next(p for p in profile.projects if p.id == new_id)
+        update["projects"] = [cv_project(source, written) if p.id == old_id else p for p in cv.projects]
+    else:  # experience stays newest first
+        source = next(e for e in profile.experience if e.id == new_id)
+        experience = [cv_experience(source, written) if e.id == old_id else e for e in cv.experience]
+        dates = {e.id: recency_key(e) for e in profile.experience}
+        update["experience"] = sorted(experience, key=lambda e: dates.get(e.id, ("", "")), reverse=True)
+    return {"final_cv": cv.model_copy(update=update),
+            "cv_swap": swap.model_copy(update={"changes": [swapped] + swap.changes})}
 
 
 def recommend_gaps_node(state: AgentState) -> AgentState:

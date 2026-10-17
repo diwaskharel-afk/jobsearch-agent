@@ -15,6 +15,7 @@ from jobfit.nodes import (
     route_after_cv,
     route_after_letter,
     route_after_match,
+    swap_cv_item_node,
 )
 
 
@@ -37,6 +38,7 @@ def build_application_graph():
     graph.add_node("generate_cv_content", generate_cv_content_node)
     graph.add_node("recommend_gaps", recommend_gaps_node)
     graph.add_node("revise_cv", revise_cv_node)
+    graph.add_node("swap_cv_item", swap_cv_item_node)
     graph.add_node("generate_cover_letter", generate_cover_letter_node)
     graph.add_node("revise_cover_letter", revise_cover_letter_node)
     graph.add_edge(START, "parse_jd")
@@ -45,10 +47,12 @@ def build_application_graph():
     # or recommendations for the gaps.
     graph.add_conditional_edges("match_profile", route_after_match,
                                 [END, "generate_cv_content", "generate_cover_letter", "recommend_gaps"])
-    # A revision note edits the CV or letter passed in from an earlier run; generation then skips itself.
-    graph.add_conditional_edges("generate_cv_content", route_after_cv, ["revise_cv", END])
+    # A revision note (or, for the CV, a swap) edits the CV or letter passed in from an earlier run;
+    # generation then skips itself.
+    graph.add_conditional_edges("generate_cv_content", route_after_cv, ["revise_cv", "swap_cv_item", END])
     graph.add_conditional_edges("generate_cover_letter", route_after_letter, ["revise_cover_letter", END])
     graph.add_edge("revise_cv", END)
+    graph.add_edge("swap_cv_item", END)
     graph.add_edge("revise_cover_letter", END)
     graph.add_edge("recommend_gaps", END)
     return graph.compile()
