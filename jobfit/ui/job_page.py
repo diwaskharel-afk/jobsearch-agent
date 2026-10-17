@@ -130,7 +130,7 @@ def render_plan_section() -> None:
                         "Something went wrong finding suggestions:"):
                 st.rerun()
     render_gap_plan(GapPlan.model_validate(st.session_state["gap_plan"]),
-                    has_gaps=bool(JobMatch.model_validate(st.session_state["job_match"]).missing))
+                    JobMatch.model_validate(st.session_state["job_match"]))
 
 
 def render_run_data() -> None:

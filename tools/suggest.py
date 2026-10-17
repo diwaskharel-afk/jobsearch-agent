@@ -222,7 +222,7 @@ if st.session_state["plan"]:
     if not reports:
         st.caption("Saved in the run; no LLM call made.")
     try:
-        render_gap_plan(GapPlan.model_validate(st.session_state["plan"]), has_gaps=bool(match.missing))
+        render_gap_plan(GapPlan.model_validate(st.session_state["plan"]), match)
     except Exception as exc:  # e.g. a run saved before the Suggestions layout
         st.warning("The run's saved suggestions couldn't be shown; get new ones.")
         st.code(str(exc))
@@ -237,7 +237,7 @@ if reports:  # newest first; tabs, since the suggestion boxes are expanders and 
     for tab, (number, report) in zip(tabs, numbered):
         with tab:
             if number != len(reports):  # the latest is drawn above
-                render_gap_plan(GapPlan.model_validate(report["plan"]), has_gaps=bool(match.missing))
+                render_gap_plan(GapPlan.model_validate(report["plan"]), match)
             render_report(report)
 
 if st.session_state["plan"]:

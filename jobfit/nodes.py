@@ -1,6 +1,8 @@
 import hashlib
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from langgraph.graph import END
 
@@ -484,6 +486,19 @@ def swap_cv_item_node(state: AgentState) -> AgentState:
             "cv_swap": swap.model_copy(update={"changes": [swapped] + swap.changes})}
 
 
+def strip_citations(text: str) -> str:
+    """Web search adds source links to its text, e.g. "... skills. ([site.com](https://...))"; the card links the page."""
+    text = re.sub(r"\s*\(\[[^\]]*\]\([^)]*\)\)", "", text)  # a "([site](url))" citation goes
+    return re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text).strip()  # any other link keeps its text
+
+
+def strip_tracking(url: str) -> str:
+    """The URL without utm_ parameters (web search adds utm_source=openai)."""
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if not k.startswith("utm_")]
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
 def recommend_gaps_node(state: AgentState) -> AgentState:
     profile = state.get("structured_profile")
     jd = state.get("structured_jd")
@@ -529,7 +544,10 @@ def recommend_gaps_node(state: AgentState) -> AgentState:
     found = []
     for c in courses.courses:  # a link that isn't a web address is dropped, not shown
         url = c.url.strip()
-        found.append(c.model_copy(update={"url": url if url.startswith(("https://", "http://")) else ""}))
+        found.append(c.model_copy(update={
+            "url": strip_tracking(url) if url.startswith(("https://", "http://")) else "",
+            "title": strip_citations(c.title), "why": strip_citations(c.why),
+        }))
 
     final_plan = GapPlan(
         project_add_ons=resolve(add_ons, MAX_PLAN_ADD_ONS),

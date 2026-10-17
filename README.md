@@ -68,7 +68,8 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
      profile doesn't show yet: up to 2 improvements to your existing projects (with build
      steps and a preview CV bullet), up to 1 small new project, and up to 3 courses or
      certifications found with a web search, low-cost first, each with its cost and a link.
-     Each suggestion is a one-line box that opens to show the details.
+     Each suggestion is a card showing effort, cost and the gaps it covers (listed on hover);
+     steps, reasons and a copyable CV bullet open from the card.
 4. **Run snapshot.** Turn on **Developer mode** in the sidebar to see the raw data of a
    job and download it as JSON (parsed JD, match, suggestions, CV and cover letter with all
    their revisions, the profile used, and the models used) to compare output quality
