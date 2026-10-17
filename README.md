@@ -34,7 +34,7 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
      exactly is lacking, e.g. "has MySQL, not PostgreSQL"
 
    The job then gets its own workspace with four tabs: **Job fit** (the analysis above),
-   **CV**, **Cover letter** and **Skill-gap plan**. Each tab has its own button, so the
+   **CV**, **Cover letter** and **Suggestions**. Each tab has its own button, so the
    analysis only shows where you look for it. The ranking is the one decision about what is
    relevant: the Job fit table shows which items the CV and the letter use, and **Re-run
    match** asks for a fresh ranking.
@@ -64,13 +64,13 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
      and the posting, not the LLM. It has the same Edit, Revise with AI, Undo/Redo and
      version picker as the CV, and downloads as a PDF (styled like the CV) or as plain text
      for application forms.
-   - **Skill-gap plan: Build my plan.** Returns a prioritised plan: add-ons that extend your
-     existing projects (with build steps and a preview CV bullet), small new projects,
-     courses, certifications or docs, hints for experience you may have left off your
-     profile, and honest advice for gaps that can't be closed quickly (degree, years
-     of experience, work permit, language).
+   - **Suggestions: Get suggestions.** A short list for what the job asks for that your
+     profile doesn't show yet: up to 2 improvements to your existing projects (with build
+     steps and a preview CV bullet), up to 1 small new project, and up to 3 courses or
+     certifications found with a web search, low-cost first, each with its cost and a link.
+     Each suggestion is a one-line box that opens to show the details.
 4. **Run snapshot.** Turn on **Developer mode** in the sidebar to see the raw data of a
-   job and download it as JSON (parsed JD, match, gap plan, CV and cover letter with all
+   job and download it as JSON (parsed JD, match, suggestions, CV and cover letter with all
    their revisions, the profile used, and the models used) to compare output quality
    across prompt or model changes.
 
@@ -99,7 +99,7 @@ streamlit run app.py
 
 Open **Profile** in the sidebar, fill it out and click **Save profile**. Then open
 **Job application**, paste a job posting, click **Analyse job**, and use the CV, Cover
-letter and Skill-gap plan tabs.
+letter and Suggestions tabs.
 
 ## Configuration
 
@@ -113,7 +113,8 @@ Settings are read from `.env`:
 | `MODEL_PARSE_JD` | Model for parsing the job description (default `gpt-6-luna`) |
 | `MODEL_MATCH` | Model for matching the profile to the job (default `gpt-6-sol`) |
 | `MODEL_CV` | Model for writing the tailored CV (default `gpt-6-sol`) |
-| `MODEL_GAPS` | Model for the gap plan (default `gpt-6-sol`) |
+| `MODEL_GAPS` | Model for the project suggestions (default `gpt-6-sol`) |
+| `MODEL_COURSES` | Model for the course and certification web search (default `gpt-6-luna`) |
 | `MODEL_REVISE` | Model for revising a CV on request (default `gpt-6-sol`) |
 | `MODEL_LETTER` | Model for writing the cover letter (default `gpt-6-sol`) |
 | `MODEL_REVISE_LETTER` | Model for revising a cover letter on request (default `gpt-6-sol`) |
@@ -121,8 +122,8 @@ Settings are read from `.env`:
 Each task also has a fixed reasoning effort. Both the default models and the efforts are
 set in `TASK_MODELS` in `jobfit/llm.py`.
 
-The simple tasks (bullets, JD parsing) use the low-cost `gpt-6-luna`. The tasks that need
-judgment and must stay truthful (match, CV, gap plan, cover letter, revisions) use `gpt-6-sol`. The frontier
+The simple tasks (bullets, JD parsing, course search) use the low-cost `gpt-6-luna`. The tasks that need
+judgment and must stay truthful (match, CV, project suggestions, cover letter, revisions) use `gpt-6-sol`. The frontier
 `gpt-6-astra` costs 5× as much as Sol, and none of these tasks needs it.
 
 ## Architecture
@@ -190,10 +191,12 @@ Job:      parse_jd → match_profile ─┬─ mode = "analyse"      → END
 - **`revise_cover_letter_node`** runs only with a letter revision note: one LLM call that
   returns the full new body (or null), with `changes` and `not_done`. The same truth rules
   apply as for the CV, including the list of requirements never to claim.
-- **`recommend_gaps_node`** shows the gaps to the LLM as `gap_1`, `gap_2`, ….
-  Code then swaps those ids for the requirement text, drops suggestions that cover no
-  real gap, sorts suggestions by importance and effort, and lists any gap left
-  without a suggestion as `uncovered`.
+- **`recommend_gaps_node`** shows the gaps to the LLM as `gap_1`, `gap_2`, … in two calls
+  that run side by side: one for project suggestions, and one with OpenAI's built-in web
+  search for courses and certifications (so only that call pays for search). Code then
+  swaps those ids for the requirement text, drops suggestions that cover no real gap and
+  course links that aren't web addresses, sorts suggestions by importance and effort, and
+  keeps at most 2 project add-ons, 1 new project and 3 courses.
 
 In short, the LLM refers to things by id and code resolves the ids against the saved
 profile. That keeps names and facts from being invented.
@@ -221,7 +224,7 @@ jobfit/                 Core package
     ├── dates.py            Month + year pickers, date badges and date checks
     ├── job_page.py         Job application page: JD form, job header, tabs, run data
     ├── job_run.py          The analysed job: its inputs for each step and the run snapshot
-    ├── job_results.py      Job fit and skill-gap plan views
+    ├── job_results.py      Job fit and Suggestions views
     ├── versions.py         Versions of the CV and letter: AI revisions, hand edits, Undo/Redo
     ├── cv_view.py          CV tab: generate, toolbar, preview, revise
     ├── cv_preview.py       On-screen CV preview, with in-place edit boxes
@@ -231,6 +234,7 @@ jobfit/                 Core package
 tools/                  Dev tools that work from a saved run log (Download run JSON)
 ├── preview_cv.py       Show a run's CV preview and PDF
 ├── revise_cv.py        Revise a run's CV with the real LLM and check the result
+├── suggest.py          Build a run's Suggestions with the real LLM, without rematching
 └── render_run_pdf.py   Render a run's CV to PDF from the command line
 ```
 
@@ -239,6 +243,7 @@ The tools read run logs from `TestRunJson/` (git-ignored) or the repo root:
 ```bash
 streamlit run tools/preview_cv.py
 streamlit run tools/revise_cv.py      # needs OPENAI_API_KEY; each revision is one LLM call
+streamlit run tools/suggest.py        # needs OPENAI_API_KEY; each build is two LLM calls (one with web search)
 python tools/render_run_pdf.py TestRunJson/<run>.json
 ```
 

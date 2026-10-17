@@ -1,4 +1,5 @@
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from langgraph.graph import END
@@ -6,6 +7,7 @@ from langgraph.graph import END
 from jobfit.models import (
     BulletList,
     CourseEntry,
+    CourseList,
     CoverLetter,
     CoverLetterRevision,
     CVRevision,
@@ -22,6 +24,7 @@ from jobfit.models import (
     JobMatch,
     ProfileExperience,
     ProfileProject,
+    ProjectPlan,
     RankedItem,
     StructuredJD,
     StructuredProfile,
@@ -53,7 +56,8 @@ from jobfit.prompts import (
     JD_EMPTY_REQUIREMENTS_NOTE,
     JD_SYSTEM_PROMPT,
     MATCH_PROFILE_SYSTEM_PROMPT,
-    RECOMMEND_GAPS_SYSTEM_PROMPT,
+    RECOMMEND_COURSES_SYSTEM_PROMPT,
+    RECOMMEND_PROJECTS_SYSTEM_PROMPT,
     REVISE_COVER_LETTER_SYSTEM_PROMPT,
     REVISE_CV_SYSTEM_PROMPT,
     SWAP_CV_ITEM_SYSTEM_PROMPT,
@@ -70,6 +74,9 @@ RELEVANCE_ORDER = {"high": 0, "medium": 1, "low": 2, "none": 3}
 IMPORTANCE_ORDER = {"required": 0, "preferred": 1, "duty": 2}
 EFFORT_ORDER = {"hours": 0, "days": 1, "weeks": 2, "months": 3}
 MAX_PLAN_STEPS = 5
+MAX_PLAN_ADD_ONS = 2
+MAX_PLAN_NEW_PROJECTS = 1
+MAX_PLAN_COURSES = 3
 MAX_LETTER_PARAGRAPHS = 6
 
 # What goes into each document is picked in code from the match ranking (best first); the
@@ -491,47 +498,46 @@ def recommend_gaps_node(state: AgentState) -> AgentState:
         f"=== CANDIDATE PROFILE ===\n{format_profile(profile)}\n\n"
         f"=== GAPS ===\n{format_gaps(match)}"
     )
-    plan = extract_structured("gaps", RECOMMEND_GAPS_SYSTEM_PROMPT, user_text, GapPlan)
+    # Two calls, so only the course search pays for web search; they run side by side.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        projects_call = pool.submit(extract_structured, "gaps", RECOMMEND_PROJECTS_SYSTEM_PROMPT, user_text,
+                                    ProjectPlan)
+        courses_call = pool.submit(extract_structured, "courses", RECOMMEND_COURSES_SYSTEM_PROMPT, user_text,
+                                   CourseList, web_search=True)
+        projects, courses = projects_call.result(), courses_call.result()
 
     # Keep only real gap ids and swap them for the requirement text; drop suggestions covering no real gap.
     gaps = gap_ids(match)
-    covered = set()
 
-    def resolve(items: list) -> list:
+    def resolve(items: list, limit: int) -> list:
         kept = []
         for item in items:
             ids = [g for g in dict.fromkeys(c.strip().strip("[]") for c in item.covers) if g in gaps]
             if not ids:
                 continue
-            covered.update(ids)
             rank = (min(IMPORTANCE_ORDER[gaps[g].importance] for g in ids), EFFORT_ORDER[item.effort])
             kept.append((rank, item.model_copy(update={"covers": [gaps[g].requirement for g in ids]})))
-        return [item for _, item in sorted(kept, key=lambda k: k[0])]
+        return [item for _, item in sorted(kept, key=lambda k: k[0])][:limit]
 
     project_names = {p.id: p.name for p in profile.projects}
     add_ons = []
-    for a in plan.project_add_ons:
+    for a in projects.project_add_ons:
         project_id = a.project_id.strip().strip("[]")
         if project_id in project_names:
             add_ons.append(a.model_copy(update={"project_id": project_id, "project_name": project_names[project_id]}))
 
-    not_fixable = []
-    for n in plan.not_fixable_now:
-        gap_id = n.requirement.strip().strip("[]")
-        if gap_id in gaps:
-            covered.add(gap_id)
-            not_fixable.append(n.model_copy(update={"requirement": gaps[gap_id].requirement}))
+    found = []
+    for c in courses.courses:  # a link that isn't a web address is dropped, not shown
+        url = c.url.strip()
+        found.append(c.model_copy(update={"url": url if url.startswith(("https://", "http://")) else ""}))
 
     final_plan = GapPlan(
-        maybe_already_have=plan.maybe_already_have,
-        project_add_ons=resolve(add_ons),
-        new_projects=resolve(plan.new_projects),
-        learning=resolve(plan.learning),
-        not_fixable_now=not_fixable,
+        project_add_ons=resolve(add_ons, MAX_PLAN_ADD_ONS),
+        new_projects=resolve(projects.new_projects, MAX_PLAN_NEW_PROJECTS),
+        courses=resolve(found, MAX_PLAN_COURSES),
     )
     for item in final_plan.project_add_ons + final_plan.new_projects:
         item.steps = item.steps[:MAX_PLAN_STEPS]
-    final_plan.uncovered = [m.requirement for gap_id, m in gaps.items() if gap_id not in covered]
     return {"gap_plan": final_plan}
 
 

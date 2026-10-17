@@ -13,7 +13,7 @@ from jobfit.ui.job_run import analyse_job, has_job, picks, rerun_match, run_inpu
 from jobfit.ui.letter_view import render_letter_section
 
 FIT, CV, LETTER, PLAN = (":material/insights: Job fit", ":material/description: CV",
-                         ":material/mail: Cover letter", ":material/trending_up: Skill-gap plan")
+                         ":material/mail: Cover letter", ":material/lightbulb: Suggestions")
 
 
 def render_job_page(existing: StructuredProfile | None) -> None:
@@ -48,7 +48,8 @@ def render_job_page(existing: StructuredProfile | None) -> None:
 def render_jd_form(existing: StructuredProfile) -> None:
     changing = has_job()
     st.caption("Paste a job posting. It's compared with your profile once; then you can write a tailored CV "
-               "and a cover letter for it, and get a plan for the skills it asks for that you don't show yet.")
+               "and a cover letter for it, and get suggestions (projects and courses) for the skills it asks "
+               "for that you don't show yet.")
     with st.form("jd_form"):
         jd_text = st.text_area("Job description", value=st.session_state.get("jd_input", ""), height=300,
                                placeholder="Paste the whole job posting here...")
@@ -114,19 +115,22 @@ def build_gap_plan() -> None:
 
 def render_plan_section() -> None:
     if not st.session_state.get("gap_plan"):
-        if empty_state("Skill-gap plan", "For each requirement your profile doesn't show yet: a way to cover it "
-                       "by extending one of your projects, a small new project, or a course, plus honest advice "
-                       "for the ones you can't close quickly.", "Build my plan", ":material/trending_up:",
+        if empty_state("Suggestions", "Ways to show what this job asks for that your profile doesn't yet: "
+                       "improve one of your projects, build a small new one, or take a course or certification "
+                       "(found with a web search, low-cost first).", "Get suggestions", ":material/lightbulb:",
                        key="plan_generate"):
-            if run_step("Building your plan...", build_gap_plan, "Something went wrong building the plan:"):
+            if run_step("Finding suggestions and searching for courses...", build_gap_plan,
+                        "Something went wrong finding suggestions:"):
                 st.rerun()
         return
     with st.container(horizontal=True, vertical_alignment="center"):
-        st.markdown("#### How to close your gaps", width="stretch")
-        if st.button("Rebuild", icon=":material/refresh:", help="Ask for a new plan; this one is replaced."):
-            if run_step("Building a new plan...", build_gap_plan, "Something went wrong building the plan:"):
+        st.markdown("#### Suggestions", width="stretch")
+        if st.button("Refresh", icon=":material/refresh:", help="Ask for new suggestions; these are replaced."):
+            if run_step("Finding new suggestions and searching for courses...", build_gap_plan,
+                        "Something went wrong finding suggestions:"):
                 st.rerun()
-    render_gap_plan(GapPlan.model_validate(st.session_state["gap_plan"]))
+    render_gap_plan(GapPlan.model_validate(st.session_state["gap_plan"]),
+                    has_gaps=bool(JobMatch.model_validate(st.session_state["job_match"]).missing))
 
 
 def render_run_data() -> None:
@@ -142,7 +146,7 @@ def render_run_data() -> None:
             ("Parsed job description", run["structured_jd"]),
             ("Job match", run["job_match"]),
             ("Items picked for the CV and letter", run["picks"]),
-            ("Skill-gap plan", run["gap_plan"]),
+            ("Suggestions", run["gap_plan"]),
             ("CV (current version)", run["final_cv"]),
             ("CV revisions", run["revisions"]),
             ("Cover letter (current version)", run["cover_letter"]),

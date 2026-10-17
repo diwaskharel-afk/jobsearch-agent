@@ -153,24 +153,28 @@ class NewProjectIdea(BaseModel):
     covers: list[str] = Field(default_factory=list)
     effort: Effort
 
-class LearningStep(BaseModel):
-    topic: str
-    kind: Literal["course", "certification", "docs"]
-    suggestion: str             # named course/cert/docs, no URLs
-    covers: list[str] = Field(default_factory=list)
-    effort: Effort
-
-class NotFixableNow(BaseModel):
-    requirement: str            # gap id, e.g. years of experience, a degree, a work permit
-    how_to_address: str         # e.g. how to frame it in a cover letter or interview
-
-class GapPlan(BaseModel):
-    maybe_already_have: list[str] = Field(default_factory=list)  # hints to add unlisted experience to the profile
+class ProjectPlan(BaseModel):
     project_add_ons: list[ProjectAddOn] = Field(default_factory=list)
     new_projects: list[NewProjectIdea] = Field(default_factory=list)
-    learning: list[LearningStep] = Field(default_factory=list)
-    not_fixable_now: list[NotFixableNow] = Field(default_factory=list)
-    uncovered: list[str] = Field(default_factory=list)  # filled in by code: gaps with no suggestion
+
+# Found with a web search, which needs a strict schema: every field is required.
+class CourseSuggestion(BaseModel):
+    title: str                  # as the provider lists it
+    kind: Literal["course", "certification"]
+    provider: str               # e.g. Coursera, Microsoft Learn
+    cost: str                   # e.g. "Free", "Free to audit, $49 for the certificate"
+    url: str                    # the course's own page, from the search
+    why: str                    # one sentence: what it gives the candidate for this job
+    covers: list[str]           # gap ids
+    effort: Effort
+
+class CourseList(BaseModel):
+    courses: list[CourseSuggestion]
+
+class GapPlan(BaseModel):  # shown as "Suggestions"
+    project_add_ons: list[ProjectAddOn] = Field(default_factory=list)
+    new_projects: list[NewProjectIdea] = Field(default_factory=list)
+    courses: list[CourseSuggestion] = Field(default_factory=list)
 
 # --- CV generation --------------------------------------------------------------
 

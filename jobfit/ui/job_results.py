@@ -1,4 +1,4 @@
-"""How a job match ("Job fit") and a gap plan ("Skill-gap plan") are shown."""
+"""How a job match ("Job fit") and a gap plan ("Suggestions") are shown."""
 import streamlit as st
 
 from jobfit.models import GapPlan, JobMatch, StructuredJD
@@ -71,45 +71,44 @@ def render_job_match(match: JobMatch, jd: StructuredJD, picks: dict[str, list[st
             st.markdown("**Tech stack**  \n" + " · ".join(md(t) for t in jd.tech_stack))
 
 
-def render_gap_plan(plan: GapPlan) -> None:
-    if not any([plan.maybe_already_have, plan.project_add_ons, plan.new_projects,
-                plan.learning, plan.not_fixable_now, plan.uncovered]):
-        st.success("Nothing to close. You already cover this job's requirements.")
+def render_gap_plan(plan: GapPlan, has_gaps: bool) -> None:
+    """Each suggestion is a one-line box; its details show only when it's opened."""
+    if not (plan.project_add_ons or plan.new_projects or plan.courses):
+        if has_gaps:
+            st.info("No project or course would close what's missing for this job (see **Job fit**).")
+        else:
+            st.success("Nothing to add. Your profile already covers this job's requirements.")
         return
 
-    if plan.maybe_already_have:
-        st.markdown("##### You may already have these: add them to your profile")
-        st.markdown("\n".join(f"- {md(hint)}" for hint in plan.maybe_already_have))
-
     if plan.project_add_ons:
-        st.markdown("##### Extend your existing projects")
+        st.markdown("##### Improve your projects")
         for a in plan.project_add_ons:
-            with st.expander(f"{a.project_name}: {a.title} ({EFFORT_LABELS[a.effort]})"):
+            with st.expander(f"{md(a.project_name)}: {md(a.title)} · {EFFORT_LABELS[a.effort]}",
+                             icon=":material/build:"):
                 st.markdown(f"**Covers:** {md(', '.join(a.covers))}")
-                st.markdown(f"**Why it fits:** {md(a.why_it_fits)}")
+                st.markdown(md(a.why_it_fits))
                 st.markdown("\n".join(f"{n}. {md(step)}" for n, step in enumerate(a.steps, start=1)))
                 st.markdown(f"**CV bullet once it's done:** _{md(a.cv_bullet_preview)}_")
 
     if plan.new_projects:
-        st.markdown("##### New projects")
+        st.markdown("##### New small project")
         for n in plan.new_projects:
-            with st.expander(f"{n.title} ({EFFORT_LABELS[n.effort]})"):
+            with st.expander(f"{md(n.title)} · {EFFORT_LABELS[n.effort]}", icon=":material/add_box:"):
                 st.markdown(f"**Covers:** {md(', '.join(n.covers))}")
-                st.write(n.description)
+                st.markdown(md(n.description))
                 if n.tech_stack:
                     st.markdown(f"**Tech stack:** {md(', '.join(n.tech_stack))}")
                 st.markdown("\n".join(f"{i}. {md(step)}" for i, step in enumerate(n.steps, start=1)))
 
-    if plan.learning:
-        st.markdown("##### Courses, certifications and docs")
-        for l in plan.learning:
-            st.markdown(f"- **{md(l.topic)}** ({l.kind}, {EFFORT_LABELS[l.effort]}): {md(l.suggestion)}. "
-                        f"_Covers: {md(', '.join(l.covers))}_")
-
-    if plan.not_fixable_now:
-        st.markdown("##### Can't close these quickly: address them instead")
-        st.markdown("\n".join(f"- **{md(n.requirement)}**: {md(n.how_to_address)}" for n in plan.not_fixable_now))
-
-    if plan.uncovered:
-        st.markdown("##### No suggestion for")
-        st.write(", ".join(plan.uncovered))
+    if plan.courses:
+        st.markdown("##### Courses and certifications")
+        for c in plan.courses:
+            icon = ":material/workspace_premium:" if c.kind == "certification" else ":material/school:"
+            with st.expander(f"{md(c.title)} ({md(c.provider)}) · {md(c.cost)} · {EFFORT_LABELS[c.effort]}",
+                             icon=icon):
+                st.markdown(f"**Covers:** {md(', '.join(c.covers))}")
+                st.markdown(md(c.why))
+                if c.url:
+                    st.link_button("Open course page" if c.kind == "course" else "Open certification page",
+                                   c.url, icon=":material/open_in_new:")
+        st.caption("Found with a web search. Check the price and content on the page before you sign up.")
