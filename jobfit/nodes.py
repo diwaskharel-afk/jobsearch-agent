@@ -583,11 +583,10 @@ def generate_cover_letter_node(state: AgentState) -> AgentState:
 
     # Everything around the body comes from the profile and the JD, never the LLM.
     company = (jd.company or "").strip() or None
-    today = date.today()
     letter = CoverLetter(
         name=profile.name,
         contact=profile.contact,
-        date=f"{today.day} {today:%B %Y}",
+        date=letter_date(date.today()),
         job_title=jd.title,
         company=company,
         greeting=f"Dear {company} team," if company else "Dear Hiring Manager,",
@@ -595,6 +594,11 @@ def generate_cover_letter_node(state: AgentState) -> AgentState:
         source_ids=picked,
     )
     return {"cover_letter": letter}
+
+
+def letter_date(day: date) -> str:
+    """The date line of a cover letter: "6 October 2026"."""
+    return f"{day.day} {day:%B %Y}"
 
 
 def route_after_letter(state: AgentState) -> str:

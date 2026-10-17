@@ -70,10 +70,17 @@ Built with [LangGraph](https://github.com/langchain-ai/langgraph), OpenAI models
      certifications found with a web search, low-cost first, each with its cost and a link.
      Each suggestion is a card showing effort, cost and the gaps it covers (listed on hover);
      steps, reasons and a copyable CV bullet open from the card.
-4. **Run snapshot.** Turn on **Developer mode** in the sidebar to see the raw data of a
-   job and download it as JSON (parsed JD, match, suggestions, CV and cover letter with all
-   their revisions, the profile used, and the models used) to compare output quality
-   across prompt or model changes.
+4. **History.** Click **Save** in the job header to keep the job under a name of your choice;
+   nothing is saved unless you do. The header shows whether there are unsaved changes, and
+   saving again updates the same entry (or tick **Save as a new entry** to keep both). The
+   **History** page lists the saved jobs: **Open** brings back the job fit, CV, cover letter
+   and suggestions exactly as saved, with no AI call, and the CV and letter can be revised,
+   swapped and downloaded as before. A reopened job keeps the profile it was analysed with;
+   if your profile has changed since, **Analyse again** starts a new entry, so the saved one is
+   never overwritten. The CV and letter come back as their saved version, without the earlier
+   versions. Entries can be renamed, deleted, downloaded as JSON, and imported from JSON.
+   Each entry is one file in `data/history/`: the job description, the profile used, the
+   parsed JD, the match, the suggestions, the CV and cover letter, and the models used.
 
 A job is analysed once: the CV, the cover letter and the plan all reuse its parsed JD
 and match. If you save a changed profile, the job page offers to analyse the job again.
@@ -217,14 +224,16 @@ jobfit/                 Core package
 ├── formatting.py       Turns the profile, JD and match into plain text for prompts
 ├── github_repo.py      Parses GitHub repo URLs and fetches and cleans a repo's README
 ├── storage.py          Loads and saves data/profile.json and assigns entry ids
+├── history.py          Saved jobs: one JSON file each in data/history/
 ├── render_cv.py        Renders the final CV to PDF with ReportLab
 ├── render_letter.py    Renders the cover letter to PDF (CV header) and plain text
 └── ui/                 Streamlit UI
     ├── profile_tab.py      Profile page: form, checks, save
     ├── profile_fields.py   Entry cards and the fields of each kind of entry
     ├── dates.py            Month + year pickers, date badges and date checks
-    ├── job_page.py         Job application page: JD form, job header, tabs, run data
-    ├── job_run.py          The analysed job: its inputs for each step and the run snapshot
+    ├── job_page.py         Job application page: JD form, job header with Save, tabs
+    ├── job_run.py          The analysed job: its inputs for each step, the run snapshot, save and open
+    ├── history_page.py     History page: open, rename, download, delete and import saved jobs
     ├── job_results.py      Job fit and Suggestions views
     ├── versions.py         Versions of the CV and letter: AI revisions, hand edits, Undo/Redo
     ├── cv_view.py          CV tab: generate, toolbar, preview, revise
@@ -232,26 +241,13 @@ jobfit/                 Core package
     ├── letter_view.py      Cover letter tab: generate, toolbar, preview, revise
     ├── letter_preview.py   On-screen letter preview, with edit boxes
     └── common.py           Small helpers
-tools/                  Dev tools that work from a saved run log (Download run JSON)
-├── preview_cv.py       Show a run's CV preview and PDF
-├── revise_cv.py        Revise a run's CV with the real LLM and check the result
-├── suggest.py          Build a run's Suggestions with the real LLM, without rematching
-└── render_run_pdf.py   Render a run's CV to PDF from the command line
-```
-
-The tools read run logs from `TestRunJson/` (git-ignored) or the repo root:
-
-```bash
-streamlit run tools/preview_cv.py
-streamlit run tools/revise_cv.py      # needs OPENAI_API_KEY; each revision is one LLM call
-streamlit run tools/suggest.py        # needs OPENAI_API_KEY; each build is two LLM calls (one with web search)
-python tools/render_run_pdf.py TestRunJson/<run>.json
 ```
 
 ## Data and privacy
 
-This is a single-user local app: one profile, stored in `data/profile.json`. The `data/`
-folder is in `.gitignore`, so personal details are never committed. Profile text, job
+This is a single-user local app: one profile, stored in `data/profile.json`, and the saved
+jobs in `data/history/`. The `data/` folder is in `.gitignore`, so personal details are never
+committed. Profile text, job
 descriptions and the READMEs of linked repos (including private ones, if a `GITHUB_TOKEN`
 is set) are sent to the OpenAI API for processing.
 

@@ -1,9 +1,11 @@
 """The cover letter section of a job: write it, preview it, change it by hand or with AI, Undo/Redo, download."""
+from datetime import date
+
 import streamlit as st
 
 from jobfit.graph import build_application_graph
 from jobfit.models import CoverLetter, StructuredProfile
-from jobfit.nodes import unpicked_mentions
+from jobfit.nodes import letter_date, unpicked_mentions
 from jobfit.render_letter import letter_text, render_letter_pdf
 from jobfit.ui import versions
 from jobfit.ui.common import empty_state, md, run_step, safe_filename
@@ -13,7 +15,7 @@ from jobfit.ui.job_run import run_inputs
 DOC = "letter"
 REVISION_PLACEHOLDER = ("e.g. Make the opening less formal. Talk more about my RAG project. "
                         "Make it a bit shorter.")
-REVISION_HELP = "Rewrites the body of the letter. The greeting and sign-off can be changed with Edit."
+REVISION_HELP = "Rewrites the body of the letter. The date, greeting and sign-off can be changed with Edit."
 
 
 def generate_letter() -> None:
@@ -75,6 +77,9 @@ def render_letter_section() -> None:
     with preview_col:
         if versions.editable_preview(DOC, _render, _apply):
             st.rerun()  # draw the preview again with the edited letter
+        if letter.date and letter.date != letter_date(date.today()) and not versions.is_editing(DOC):
+            st.info(f"This letter is dated **{md(letter.date)}**. Click **Edit** to change the date before "
+                    "you send it.")
         if mentions := unpicked_mentions(letter, StructuredProfile.model_validate(st.session_state["run_profile"])):
             st.warning("The letter mentions " + ", ".join(f"**{md(m)}**" for m in mentions) + ", which wasn't "
                        "ranked relevant to this job, so its details weren't checked against your profile.")

@@ -20,7 +20,9 @@ def render_letter_preview(letter: CoverLetter, edit: bool = False, version: int 
             if contact else []
         if parts:
             st.caption(" &nbsp;|&nbsp; ".join(parts))
-        if _clean(letter.date):
+        if edit:
+            letter_date = st.text_input("Date", value=letter.date or "", key=f"letter_date_{version}")
+        elif _clean(letter.date):
             st.caption(md(letter.date))
         if subject := subject_line(letter):
             st.markdown(f"**{md(subject)}**")
@@ -30,7 +32,8 @@ def render_letter_preview(letter: CoverLetter, edit: bool = False, version: int 
             body = st.text_area("Letter", value="\n\n".join(letter.paragraphs), key=f"letter_body_{version}",
                                 height=460, help="Leave an empty line between paragraphs.")
             closing = st.text_input("Sign-off", value=letter.closing, key=f"letter_closing_{version}")
-            return {"greeting": greeting, "paragraphs": re.split(r"\n\s*\n", body), "closing": closing}
+            return {"date": letter_date, "greeting": greeting, "paragraphs": re.split(r"\n\s*\n", body),
+                    "closing": closing}
 
         st.markdown(md(letter.greeting))
         for paragraph in letter.paragraphs:
@@ -46,6 +49,7 @@ def apply_letter_edits(letter: CoverLetter, edits: dict) -> CoverLetter:
     body, a hand-written one keeps every paragraph."""
     paragraphs = [" ".join(p.split()) for p in edits["paragraphs"] if p.strip()]
     return letter.model_copy(update={
+        "date": edits["date"].strip() or letter.date,
         "greeting": edits["greeting"].strip() or letter.greeting,
         "paragraphs": paragraphs or letter.paragraphs,
         "closing": edits["closing"].strip() or letter.closing,

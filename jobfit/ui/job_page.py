@@ -1,15 +1,13 @@
 """The Job application page: paste a job, analyse it once, then work on each part in its own tab."""
-import json
-from datetime import datetime
-
 import streamlit as st
 
 from jobfit.graph import build_application_graph
 from jobfit.models import GapPlan, JobMatch, StructuredJD, StructuredProfile
-from jobfit.ui.common import empty_state, md, run_step, safe_filename
+from jobfit.ui.common import empty_state, md, run_step
 from jobfit.ui.cv_view import render_cv_section
 from jobfit.ui.job_results import render_gap_plan, render_job_match
-from jobfit.ui.job_run import analyse_job, has_job, picks, rerun_match, run_inputs, run_snapshot
+from jobfit.ui.job_run import (analyse_job, default_name, has_job, has_unsaved_changes, picks, rerun_match,
+                               run_inputs, save_job, saved_entry)
 from jobfit.ui.letter_view import render_letter_section
 
 FIT, CV, LETTER, PLAN = (":material/insights: Job fit", ":material/description: CV",
@@ -40,9 +38,6 @@ def render_job_page(existing: StructuredProfile | None) -> None:
     if plan_tab.open:
         with plan_tab:
             render_plan_section()
-
-    if st.session_state.get("dev_mode"):
-        render_run_data()
 
 
 def render_jd_form(existing: StructuredProfile) -> None:
@@ -82,8 +77,12 @@ def render_job_header(existing: StructuredProfile) -> None:
                 badges.append(f":violet-badge[{md(jd.seniority)}]")
             if badges:
                 st.markdown(" ".join(badges))
-        actions_col.button("Change job", icon=":material/swap_horiz:", width="stretch",
-                           on_click=lambda: st.session_state.update(changing_job=True))
+            render_save_status()
+        with actions_col:
+            render_save_menu(jd)
+            st.button("Change job", icon=":material/swap_horiz:", width="stretch",
+                      on_click=lambda: st.session_state.update(changing_job=True),
+                      help="Unsaved work on this job is lost; save it first to keep it.")
 
     if existing.model_dump() != st.session_state["run_profile"]:
         with st.container(horizontal=True, vertical_alignment="center"):
@@ -94,6 +93,33 @@ def render_job_header(existing: StructuredProfile) -> None:
                             lambda: analyse_job(st.session_state["jd_input"], existing),
                             "Something went wrong processing this job description:"):
                     st.rerun()
+
+
+def render_save_status() -> None:
+    entry = saved_entry()
+    if entry is None:
+        st.caption(":material/bookmark_border: Not saved. **Save** keeps it in History.")
+    elif has_unsaved_changes():
+        st.caption(f":material/bookmark: Saved as **{md(entry['name'])}** · :orange[unsaved changes]")
+    else:
+        st.caption(f":material/bookmark: Saved as **{md(entry['name'])}**")
+
+
+def render_save_menu(jd: StructuredJD) -> None:
+    """Save the job to History under a name: over its entry once it has one, or as a new entry."""
+    entry = saved_entry()
+    form_key = f"save_job_{entry['id'] if entry else st.session_state['match_key']}"  # refills the name per entry
+    with st.popover("Save", icon=":material/bookmark:", width="stretch"):
+        with st.form(form_key, border=False):
+            name = st.text_input("Name", value=entry["name"] if entry else default_name(jd.model_dump()),
+                                 max_chars=120)
+            as_new = st.checkbox("Save as a new entry", help="Keeps the saved one as it is.") if entry else False
+            submitted = st.form_submit_button("Save", type="primary", icon=":material/check:")
+        st.caption("Saves the job fit, CV, cover letter and suggestions as they are now. Open it again from "
+                   "**History**; no AI needed.")
+    if submitted:
+        save_job(name.strip() or default_name(jd.model_dump()), as_new)
+        st.rerun()  # redraw the status line above
 
 
 def render_fit_section() -> None:
@@ -131,30 +157,3 @@ def render_plan_section() -> None:
                 st.rerun()
     render_gap_plan(GapPlan.model_validate(st.session_state["gap_plan"]),
                     JobMatch.model_validate(st.session_state["job_match"]))
-
-
-def render_run_data() -> None:
-    run = run_snapshot()
-    run_filename = f"{datetime.now():%Y%m%d_%H%M%S}_{safe_filename(run['structured_jd'].get('title'), 'run')}.json"
-    st.divider()
-    with st.expander("Developer: raw data and run download", icon=":material/code:"):
-        st.caption("Snapshot of the JD, profile, match and everything written for this job, for analysing "
-                   "output quality. Nothing is saved to disk.")
-        st.download_button("Download run (JSON)", data=json.dumps(run, indent=2, ensure_ascii=False),
-                           file_name=run_filename, mime="application/json", on_click="ignore")
-        raw_sections = [
-            ("Parsed job description", run["structured_jd"]),
-            ("Job match", run["job_match"]),
-            ("Items picked for the CV and letter", run["picks"]),
-            ("Suggestions", run["gap_plan"]),
-            ("CV (current version)", run["final_cv"]),
-            ("CV revisions", run["revisions"]),
-            ("Cover letter (current version)", run["cover_letter"]),
-            ("Cover letter revisions", run["letter_revisions"]),
-            ("Profile used for this run", run["structured_profile"]),
-            ("Models used", run["models"]),
-        ]
-        for label, data in raw_sections:
-            if data:
-                with st.expander(label):
-                    st.json(data)
