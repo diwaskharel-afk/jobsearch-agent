@@ -1,9 +1,12 @@
 import hashlib
+from datetime import date
 
 from langgraph.graph import END
 
 from jobfit.models import (
     BulletList,
+    CoverLetter,
+    CoverLetterRevision,
     CVRevision,
     FinalCV,
     FinalCVCourse,
@@ -12,6 +15,7 @@ from jobfit.models import (
     FinalCVProject,
     GapPlan,
     GeneratedCVContent,
+    GeneratedCoverLetter,
     JobMatch,
     ProfileExperience,
     ProfileProject,
@@ -22,12 +26,14 @@ from jobfit.models import (
 from jobfit.state import AgentState
 from jobfit.github_repo import RepoFetchError, fetch_readme, parse_github_url
 from jobfit.llm import extract_structured, model_for
+from jobfit.render_cv import _pretty_project_name
 from jobfit.storage import assign_profile_ids
 from jobfit.formatting import (
     format_cv_for_revision,
     format_gaps,
     format_jd,
     format_job_match,
+    format_letter_body,
     format_missing,
     format_month,
     format_profile,
@@ -39,11 +45,13 @@ from jobfit.formatting import (
 from jobfit.prompts import (
     BULLETS_README_NOTE,
     BULLETS_SYSTEM_PROMPT,
+    COVER_LETTER_SYSTEM_PROMPT,
     CV_CONTENT_SYSTEM_PROMPT,
     JD_EMPTY_REQUIREMENTS_NOTE,
     JD_SYSTEM_PROMPT,
     MATCH_PROFILE_SYSTEM_PROMPT,
     RECOMMEND_GAPS_SYSTEM_PROMPT,
+    REVISE_COVER_LETTER_SYSTEM_PROMPT,
     REVISE_CV_SYSTEM_PROMPT,
 )
 
@@ -58,6 +66,15 @@ RELEVANCE_ORDER = {"high": 0, "medium": 1, "low": 2, "none": 3}
 IMPORTANCE_ORDER = {"required": 0, "preferred": 1, "duty": 2}
 EFFORT_ORDER = {"hours": 0, "days": 1, "weeks": 2, "months": 3}
 MAX_PLAN_STEPS = 5
+MAX_LETTER_PARAGRAPHS = 6
+
+# What goes into each document is picked in code from the match ranking (best first); the
+# LLMs that write the CV and the cover letter never see the other items and never choose.
+# A CV has limited room, so each kind of item has a cap; the letter takes every relevant item.
+# Only these levels are used, even if that leaves a CV section short or empty.
+CV_RELEVANCE = ("high", "medium")
+CV_LIMITS = {"proj": MAX_CV_PROJECTS, "exp": MAX_CV_EXPERIENCE, "course": MAX_CV_COURSES}  # no certifications
+LETTER_RELEVANCE = ("high", "medium")
 
 
 def intake_profile_node(state: AgentState) -> AgentState:
@@ -226,6 +243,22 @@ def match_profile_node(state: AgentState) -> AgentState:
     return {"job_match": match}
 
 
+def pick_for_cv(match: JobMatch) -> list[str]:
+    """Ids of the items that go on the CV: the best-ranked of each kind at CV_RELEVANCE, up to CV_LIMITS."""
+    picked, counts = [], {}
+    for item in match.items:  # best first
+        kind = item.id.split("_")[0]
+        if item.relevance in CV_RELEVANCE and counts.get(kind, 0) < CV_LIMITS.get(kind, 0):
+            counts[kind] = counts.get(kind, 0) + 1
+            picked.append(item.id)
+    return picked
+
+
+def pick_for_letter(match: JobMatch) -> list[str]:
+    """Ids of every item at LETTER_RELEVANCE, best first, however many there are."""
+    return [item.id for item in match.items if item.relevance in LETTER_RELEVANCE]
+
+
 def generate_cv_content_node(state: AgentState) -> AgentState:
     profile = state.get("structured_profile")
     jd = state.get("structured_jd")
@@ -235,52 +268,54 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
     if state.get("final_cv") is not None:  # revising a CV generated in an earlier run
         return {}
 
+    picked = pick_for_cv(match)
     user_text = (
         f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
-        f"=== CANDIDATE PROFILE ===\n{format_profile(profile)}\n\n"
-        f"=== MATCH ===\n{format_job_match(match)}"
+        f"=== CANDIDATE PROFILE ===\n{format_profile(profile, only_ids=set(picked))}\n\n"
+        f"=== MATCH ===\n{format_job_match(match, only_ids=set(picked))}"
     )
     generated = extract_structured("cv", CV_CONTENT_SYSTEM_PROMPT, user_text, GeneratedCVContent)
 
-    # Names, stacks, urls and dates always come from the saved profile, never the LLM.
+    # The LLM writes the bullets and stacks; which items appear, their names, urls and dates
+    # always come from the picks and the saved profile. An item the LLM skipped keeps its
+    # profile bullets, so every picked item is on the CV.
+    written = {}
+    for item in generated.projects + generated.experience:
+        written.setdefault(item.id.strip().strip("[]"), item)
     projects_by_id = {p.id: p for p in profile.projects}
     final_projects = [
         FinalCVProject(
             id=source.id,
             name=source.name,
-            tech_stack=gp.tech_stack,
+            tech_stack=written[source.id].tech_stack if source.id in written else [],
             repo_url=source.repo_url,
-            bullets=gp.bullets[:MAX_CV_BULLETS],
+            bullets=(written[source.id].bullets if source.id in written else source.bullets)[:MAX_CV_BULLETS],
         )
-        for gp in generated.projects
-        if (source := projects_by_id.get(gp.id.strip()))
-    ][:MAX_CV_PROJECTS]
+        for item_id in picked
+        if (source := projects_by_id.get(item_id))
+    ]
 
-    # The LLM picks experience by relevance; the CV lists the picked ones newest first.
+    # Picked by relevance, listed newest first.
     experience_by_id = {e.id: e for e in profile.experience}
-    picked_experience = [
-        (source, ge)
-        for ge in generated.experience
-        if (source := experience_by_id.get(ge.id.strip()))
-    ][:MAX_CV_EXPERIENCE]
+    picked_experience = [source for item_id in picked if (source := experience_by_id.get(item_id))]
     final_experience = [
         FinalCVExperience(
             id=source.id,
             title=source.title,
             organization=source.organization,
             duration=format_range(source),
-            bullets=ge.bullets[:MAX_CV_BULLETS],
+            bullets=(written[source.id].bullets if source.id in written
+                     else source.bullets or source.responsibilities)[:MAX_CV_BULLETS],
         )
-        for source, ge in sorted(picked_experience, key=lambda pick: recency_key(pick[0]), reverse=True)
+        for source in sorted(picked_experience, key=recency_key, reverse=True)
     ]
 
     courses_by_id = {c.id: c for c in profile.courses}
-    course_ids = dict.fromkeys(c.strip().strip("[]") for c in generated.courses)
     final_courses = [
         FinalCVCourse(name=source.name, provider=source.provider, date=format_month(source.date) or None)
-        for course_id in course_ids
-        if (source := courses_by_id.get(course_id))
-    ][:MAX_CV_COURSES]
+        for item_id in picked
+        if (source := courses_by_id.get(item_id))
+    ]
 
     final_cv = FinalCV(
         name=profile.name,
@@ -301,7 +336,8 @@ def generate_cv_content_node(state: AgentState) -> AgentState:
 
 
 def route_after_match(state: AgentState) -> str:
-    return "recommend_gaps" if state.get("mode") == "recommend" else "generate_cv_content"
+    branches = {"analyse": END, "recommend": "recommend_gaps", "cover_letter": "generate_cover_letter"}
+    return branches.get(state.get("mode"), "generate_cv_content")
 
 
 def route_after_cv(state: AgentState) -> str:
@@ -422,3 +458,90 @@ def recommend_gaps_node(state: AgentState) -> AgentState:
         item.steps = item.steps[:MAX_PLAN_STEPS]
     final_plan.uncovered = [m.requirement for gap_id, m in gaps.items() if gap_id not in covered]
     return {"gap_plan": final_plan}
+
+
+def clean_paragraphs(paragraphs: list[str] | None) -> list[str]:
+    """Trimmed, non-empty paragraphs, each on one line, at most MAX_LETTER_PARAGRAPHS."""
+    return [" ".join(p.split()) for p in paragraphs or [] if p.strip()][:MAX_LETTER_PARAGRAPHS]
+
+
+def generate_cover_letter_node(state: AgentState) -> AgentState:
+    profile = state.get("structured_profile")
+    jd = state.get("structured_jd")
+    match = state.get("job_match")
+    if profile is None or jd is None or match is None:
+        return {}
+    if state.get("cover_letter") is not None:  # revising a letter written in an earlier run
+        return {}
+
+    picked = pick_for_letter(match)
+    user_text = (
+        f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
+        f"=== CANDIDATE PROFILE ===\n{format_profile(profile, only_ids=set(picked))}\n\n"
+        f"=== MATCH ===\n{format_job_match(match, only_ids=set(picked))}"
+    )
+    generated = extract_structured("letter", COVER_LETTER_SYSTEM_PROMPT, user_text, GeneratedCoverLetter)
+
+    # Everything around the body comes from the profile and the JD, never the LLM.
+    company = (jd.company or "").strip() or None
+    today = date.today()
+    letter = CoverLetter(
+        name=profile.name,
+        contact=profile.contact,
+        date=f"{today.day} {today:%B %Y}",
+        job_title=jd.title,
+        company=company,
+        greeting=f"Dear {company} team," if company else "Dear Hiring Manager,",
+        paragraphs=clean_paragraphs(generated.paragraphs),
+        source_ids=picked,
+    )
+    return {"cover_letter": letter}
+
+
+def route_after_letter(state: AgentState) -> str:
+    return "revise_cover_letter" if (state.get("letter_revision_request") or "").strip() else END
+
+
+def apply_letter_revision(letter: CoverLetter, revision: CoverLetterRevision) -> CoverLetter:
+    """A copy of the letter with the revised body; an empty body counts as unchanged."""
+    return letter.model_copy(update={"paragraphs": clean_paragraphs(revision.paragraphs) or letter.paragraphs})
+
+
+def revise_cover_letter_node(state: AgentState) -> AgentState:
+    letter = state.get("cover_letter")
+    profile = state.get("structured_profile")
+    jd = state.get("structured_jd")
+    match = state.get("job_match")
+    request = (state.get("letter_revision_request") or "").strip()
+    if letter is None or profile is None or jd is None or match is None or not request:
+        return {}
+
+    user_text = (
+        f"=== JOB DESCRIPTION ===\n{format_jd(jd)}\n\n"
+        f"=== CANDIDATE PROFILE ===\n{format_profile(profile, only_ids=set(letter.source_ids))}\n\n"
+        f"=== NEVER CLAIM ===\n{format_missing(match) or 'Nothing.'}\n\n"
+        f"=== CURRENT LETTER ===\n{format_letter_body(letter)}\n\n"
+        f"=== REQUEST ===\n{request}"
+    )
+    revision = extract_structured("revise_letter", REVISE_COVER_LETTER_SYSTEM_PROMPT, user_text, CoverLetterRevision)
+    return {"cover_letter": apply_letter_revision(letter, revision), "letter_revision": revision}
+
+
+def mention_names(profile: StructuredProfile) -> list[tuple[str, str]]:
+    """(id, a name a letter would use for it): each project as written and as a title, each experience's employer."""
+    names = []
+    for p in profile.projects:
+        names += [(p.id, p.name.strip()), (p.id, _pretty_project_name(p.name))]
+    names += [(e.id, e.organization.strip()) for e in profile.experience]
+    return names
+
+
+def unpicked_mentions(letter: CoverLetter, profile: StructuredProfile) -> list[str]:
+    """Projects and employers the letter names although it wasn't written from them, for a warning."""
+    allowed = set(letter.source_ids)
+    allowed_names = {name.lower() for item_id, name in mention_names(profile) if item_id in allowed}
+    body = " ".join(letter.paragraphs).lower()
+    return list(dict.fromkeys(
+        name for item_id, name in mention_names(profile)
+        if item_id not in allowed and len(name) >= 4 and name.lower() not in allowed_names and name.lower() in body
+    ))

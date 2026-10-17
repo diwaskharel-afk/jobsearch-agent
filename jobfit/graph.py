@@ -4,13 +4,16 @@ from jobfit.state import AgentState
 from jobfit.nodes import (
     fetch_readmes_node,
     format_bullets_node,
+    generate_cover_letter_node,
     generate_cv_content_node,
     intake_profile_node,
     match_profile_node,
     parse_jd_node,
     recommend_gaps_node,
+    revise_cover_letter_node,
     revise_cv_node,
     route_after_cv,
+    route_after_letter,
     route_after_match,
 )
 
@@ -34,12 +37,18 @@ def build_application_graph():
     graph.add_node("generate_cv_content", generate_cv_content_node)
     graph.add_node("recommend_gaps", recommend_gaps_node)
     graph.add_node("revise_cv", revise_cv_node)
+    graph.add_node("generate_cover_letter", generate_cover_letter_node)
+    graph.add_node("revise_cover_letter", revise_cover_letter_node)
     graph.add_edge(START, "parse_jd")
     graph.add_edge("parse_jd", "match_profile")
-    # Optional branch: the user picks a tailored CV or recommendations for their gaps.
-    graph.add_conditional_edges("match_profile", route_after_match, ["generate_cv_content", "recommend_gaps"])
-    # A revision note edits the CV passed in from an earlier run; generation then skips itself.
+    # Optional branch: stop after the match ("analyse"), or write a tailored CV, a cover letter
+    # or recommendations for the gaps.
+    graph.add_conditional_edges("match_profile", route_after_match,
+                                [END, "generate_cv_content", "generate_cover_letter", "recommend_gaps"])
+    # A revision note edits the CV or letter passed in from an earlier run; generation then skips itself.
     graph.add_conditional_edges("generate_cv_content", route_after_cv, ["revise_cv", END])
+    graph.add_conditional_edges("generate_cover_letter", route_after_letter, ["revise_cover_letter", END])
     graph.add_edge("revise_cv", END)
+    graph.add_edge("revise_cover_letter", END)
     graph.add_edge("recommend_gaps", END)
     return graph.compile()

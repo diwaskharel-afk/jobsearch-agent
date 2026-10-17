@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-Task = Literal["bullets", "parse_jd", "match", "cv", "gaps", "revise"]
+Task = Literal["bullets", "parse_jd", "match", "cv", "gaps", "revise", "letter", "revise_letter"]
 
 # Each task gets the cheapest model that does it well. Override a model with an env var,
 # e.g. MODEL_GAPS=gpt-6-luna to cut cost, or MODEL_PARSE_JD=gpt-6-sol for harder postings.
@@ -19,6 +19,8 @@ TASK_MODELS: dict[Task, tuple[str, str]] = {  # task -> (model, reasoning effort
     "cv": ("gpt-6-sol", "medium"),         # tailored writing that must stay truthful
     "gaps": ("gpt-6-sol", "medium"),       # technical advice: realistic, correct project plans
     "revise": ("gpt-6-sol", "low"),        # small edits to a CV on request that must stay truthful
+    "letter": ("gpt-6-sol", "medium"),     # a short, natural cover letter that must stay truthful
+    "revise_letter": ("gpt-6-sol", "low"), # edits to a cover letter on request
 }
 
 T = TypeVar("T", bound=BaseModel)

@@ -1,6 +1,15 @@
 from typing import Literal, TypedDict
 
-from jobfit.models import CVRevision, FinalCV, GapPlan, JobMatch, StructuredJD, StructuredProfile
+from jobfit.models import (
+    CoverLetter,
+    CoverLetterRevision,
+    CVRevision,
+    FinalCV,
+    GapPlan,
+    JobMatch,
+    StructuredJD,
+    StructuredProfile,
+)
 
 
 class AgentState(TypedDict, total=False):
@@ -16,5 +25,9 @@ class AgentState(TypedDict, total=False):
     final_cv: FinalCV                      # tailored CV content, ready to render
     revision_request: str                  # the user's note for changing final_cv; empty = no revision
     cv_revision: CVRevision                # what the revision changed or refused, for the UI
-    mode: Literal["cv", "recommend"]       # which branch to take after matching
+    # Which branch to take after matching; "analyse" stops after the match.
+    mode: Literal["analyse", "cv", "recommend", "cover_letter"]
     gap_plan: GapPlan                      # suggestions for closing the missing requirements
+    cover_letter: CoverLetter              # cover letter for this job, ready to render
+    letter_revision_request: str           # the user's note for changing cover_letter; empty = no revision
+    letter_revision: CoverLetterRevision   # what the letter revision changed or refused, for the UI

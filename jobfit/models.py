@@ -184,7 +184,6 @@ class GeneratedCVContent(BaseModel):
     skills: list[str] = Field(default_factory=list)
     projects: list[GeneratedCVItem] = Field(default_factory=list)
     experience: list[GeneratedCVItem] = Field(default_factory=list)
-    courses: list[str] = Field(default_factory=list)  # course ids, most relevant first
 
 class FinalCVProject(BaseModel):
     id: str = ""            # profile id (proj_1), so a revision can find the item; never shown on the CV
@@ -239,6 +238,32 @@ class CVRevision(BaseModel):
     skills: Optional[list[str]] = Field(default=None, description="The full new skills list; null if unchanged")
     items: list[RevisedCVItem] = Field(
         default_factory=list, description="Only the projects and experience that change")
+    changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
+    not_done: list[str] = Field(
+        default_factory=list, description="Each part of the request that was not done, and why")
+
+# --- Cover letter -----------------------------------------------------------------
+# The LLM writes only the body. Name, contact, date, company, greeting and sign-off come
+# from the profile and the JD in code, the same way the CV's names and dates do.
+
+class GeneratedCoverLetter(BaseModel):
+    paragraphs: list[str] = Field(
+        default_factory=list, description="The letter's body: 3-4 short paragraphs, without greeting or sign-off")
+
+class CoverLetter(BaseModel):
+    name: Optional[str] = None
+    contact: Optional[ContactInfo] = None
+    date: Optional[str] = None          # "6 October 2026", the day it was written
+    job_title: str = ""
+    company: Optional[str] = None
+    greeting: str = "Dear Hiring Manager,"
+    paragraphs: list[str] = Field(default_factory=list)
+    closing: str = "Best regards,"
+    source_ids: list[str] = Field(default_factory=list)  # the profile items it was written from; revisions keep to them
+
+class CoverLetterRevision(BaseModel):
+    paragraphs: Optional[list[str]] = Field(
+        default=None, description="The letter's full new body, every paragraph; null if unchanged")
     changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
     not_done: list[str] = Field(
         default_factory=list, description="Each part of the request that was not done, and why")

@@ -26,18 +26,13 @@ from jobfit.llm import TASK_MODELS, model_for
 from jobfit.models import FinalCV, StructuredProfile
 from jobfit.render_cv import render_cv_pdf
 from jobfit.ui.common import md, safe_filename
-from jobfit.ui.cv_revisions import (
-    REVISION_PLACEHOLDER,
-    editable_cv_preview,
-    render_revision_result,
-    revise_cv,
-    undo_revision,
-)
+from jobfit.ui import versions
+from jobfit.ui.cv_view import DOC, REVISION_PLACEHOLDER, editable_cv, revise_cv
+from jobfit.ui.job_run import clear_job
+from jobfit.ui.versions import render_revision_result
 from render_run_pdf import load_final_cv
 
 RUN_DIRS = (PROJECT_DIR / "TestRunJson", PROJECT_DIR)
-APP_KEYS = ("final_cv", "cv_history", "last_revision", "revisions", "cv_pdf_bytes", "cv_editing",
-            "run_profile", "parsed_jd", "job_match")  # what the app's revise_cv and editor read and write
 
 
 def saved_runs() -> list[Path]:
@@ -121,7 +116,7 @@ def record(request: str, action) -> bool:
         calls.append({"task": task, "model": model_for(task), "user_text": user_text, "result": result.model_dump()})
         return result
 
-    before = st.session_state["final_cv"]
+    before = versions.current(DOC)
     nodes.extract_structured = recording_llm
     start = time.perf_counter()
     try:
@@ -130,7 +125,7 @@ def record(request: str, action) -> bool:
         nodes.extract_structured = real_llm
     if done is False:  # the manual form drawn but not saved: nothing to report
         return False
-    after = st.session_state["final_cv"]
+    after = versions.current(DOC)
     checks = manual_checks(before, after, calls) if request == MANUAL else run_checks(before, after, calls, request)
     st.session_state["reports"].append({
         "request": request, "seconds": round(time.perf_counter() - start, 1), "calls": calls,
@@ -283,10 +278,10 @@ except Exception as exc:
 run_key = f"upload:{upload.name}:{upload.size}" if upload is not None else str(run_path)
 if reload or st.session_state.get("loaded_run") != run_key:
     cv, filled, unmatched = backfill_ids(saved_cv, profile)
-    for key in APP_KEYS:
-        st.session_state.pop(key, None)
+    clear_job()  # the app's job state: what its revise_cv and editor read and write
+    versions.start(DOC, cv.model_dump(), "Saved run")
     st.session_state.update(
-        loaded_run=run_key, reports=[], id_notes=(filled, unmatched), cv_history=[], final_cv=cv.model_dump(),
+        loaded_run=run_key, reports=[], id_notes=(filled, unmatched),
         run_profile=run["structured_profile"], parsed_jd=run["structured_jd"], job_match=run["job_match"],
     )
 
@@ -308,12 +303,13 @@ if unmatched:
 
 cv_col, revise_col = st.columns([3, 2], gap="large")
 
+index, total = versions.position(DOC)
+editing = versions.is_editing(DOC)  # the LLM, Undo and Redo wait until the edit is saved
 with cv_col:
-    history = st.session_state["cv_history"]
-    st.subheader(f"CV · version {len(history) + 1}")
-    if record(MANUAL, lambda: editable_cv_preview(len(history))):
+    st.subheader(f"CV · version {index + 1} of {total}")
+    st.button("✏️ Edit", on_click=versions.set_editing, args=(DOC, True), disabled=editing)
+    if record(MANUAL, editable_cv):
         st.rerun()  # draw the preview again with the edited CV
-editing = st.session_state.get("cv_editing", False)  # the LLM and Undo wait until the edit is saved
 
 with revise_col:
     st.subheader("Revise")
@@ -324,7 +320,9 @@ with revise_col:
     request = st.text_area("What should change?", key="request", placeholder=REVISION_PLACEHOLDER,
                            height=110)
     revise_clicked = st.button("Revise with the LLM", type="primary", disabled=editing)
-    st.button("↩ Undo last change", on_click=undo_revision, disabled=not history or editing)
+    undo_col, redo_col = st.columns(2)
+    undo_col.button("↩ Undo", on_click=versions.go_to, args=(DOC, index - 1), disabled=index == 0 or editing)
+    redo_col.button("↪ Redo", on_click=versions.go_to, args=(DOC, index + 1), disabled=index == total - 1 or editing)
 
     if revise_clicked:
         if not request.strip():
@@ -339,7 +337,7 @@ with revise_col:
             else:
                 st.rerun()  # the preview is drawn left of the form, so draw it again with the new CV
 
-    if last := st.session_state.get("last_revision"):
+    if last := versions.last_change(DOC):
         render_revision_result(last)
 
     reports = st.session_state["reports"]
@@ -352,13 +350,13 @@ with revise_col:
             render_report(report)
 
     st.divider()
-    final_cv = FinalCV.model_validate(st.session_state["final_cv"])
+    final_cv = FinalCV.model_validate(versions.current(DOC))
     st.download_button("Download CV (PDF)", data=render_cv_pdf(final_cv),
                        file_name=f"{safe_filename(final_cv.name, 'cv')}_cv.pdf", mime="application/pdf")
     revised_run = {  # same shape as the app's run download, with this session's revisions
         **run, "saved_at": datetime.now().isoformat(timespec="seconds"),
         "models": {task: model_for(task) for task in TASK_MODELS},
-        "final_cv": st.session_state["final_cv"], "revisions": st.session_state.get("revisions"),
+        "final_cv": versions.current(DOC), "revisions": versions.log(DOC),
     }
     st.download_button("Download run (JSON)", data=json.dumps(revised_run, indent=2, ensure_ascii=False),
                        file_name=f"{datetime.now():%Y%m%d_%H%M%S}_{safe_filename(jd.get('title'), 'run')}.json",
