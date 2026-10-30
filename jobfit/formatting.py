@@ -1,4 +1,6 @@
-from jobfit.models import DatedRange, FinalCV, JobMatch, MissingRequirement, StructuredJD, StructuredProfile
+from jobfit.models import (
+    CoverLetter, DatedRange, FinalCV, JobMatch, MissingRequirement, StructuredJD, StructuredProfile,
+)
 
 
 def format_month(year_month: str | None) -> str:
@@ -105,9 +107,11 @@ def format_profile(profile: StructuredProfile, only_ids: set[str] | None = None)
     return "\n\n".join(sections)
 
 
-def format_job_match(match: JobMatch) -> str:
-    lines = ["Profile items ranked by relevance:"]
-    lines += [f"- [{i.id}] {i.name}: {i.relevance} — {i.reason}" for i in match.items]
+def format_job_match(match: JobMatch, only_ids: set[str] | None = None) -> str:
+    """The match as prompt text. only_ids limits the ranked items to those ids (None = all)."""
+    items = [i for i in match.items if only_ids is None or i.id in only_ids]
+    lines = ["Profile items ranked by relevance:" if only_ids is None else "Why each item fits this job, best first:"]
+    lines += [f"- [{i.id}] {i.name}: {i.relevance} — {i.reason}" for i in items] or ["- None."]
     if match.relevant_skills:
         lines.append(f"\nRelevant skills: {', '.join(match.relevant_skills)}")
     if match.missing:
@@ -130,6 +134,11 @@ def format_cv_for_revision(cv: FinalCV) -> str:
         lines.append(f"\n[{e.id}] Experience: {e.title} at {e.organization} ({e.duration})")
         lines += [f"  - {b}" for b in e.bullets]
     return "\n".join(lines)
+
+
+def format_letter_body(letter: CoverLetter) -> str:
+    """The paragraphs a letter revision can change, separated by blank lines."""
+    return "\n\n".join(letter.paragraphs)
 
 
 def gap_ids(match: JobMatch) -> dict[str, MissingRequirement]:

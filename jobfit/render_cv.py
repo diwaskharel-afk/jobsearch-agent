@@ -166,6 +166,7 @@ def _dot_join(items: list[str]) -> str:
 # --- Sections ----------------------------------------------------------------------
 
 def _header(cv: FinalCV) -> list:
+    """Name, contact line and rule; the cover letter uses it too (it has the same name and contact)."""
     story = []
     if cv.name:
         story.append(Paragraph(_e(cv.name), _NAME))

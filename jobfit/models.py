@@ -153,24 +153,28 @@ class NewProjectIdea(BaseModel):
     covers: list[str] = Field(default_factory=list)
     effort: Effort
 
-class LearningStep(BaseModel):
-    topic: str
-    kind: Literal["course", "certification", "docs"]
-    suggestion: str             # named course/cert/docs, no URLs
-    covers: list[str] = Field(default_factory=list)
-    effort: Effort
-
-class NotFixableNow(BaseModel):
-    requirement: str            # gap id, e.g. years of experience, a degree, a work permit
-    how_to_address: str         # e.g. how to frame it in a cover letter or interview
-
-class GapPlan(BaseModel):
-    maybe_already_have: list[str] = Field(default_factory=list)  # hints to add unlisted experience to the profile
+class ProjectPlan(BaseModel):
     project_add_ons: list[ProjectAddOn] = Field(default_factory=list)
     new_projects: list[NewProjectIdea] = Field(default_factory=list)
-    learning: list[LearningStep] = Field(default_factory=list)
-    not_fixable_now: list[NotFixableNow] = Field(default_factory=list)
-    uncovered: list[str] = Field(default_factory=list)  # filled in by code: gaps with no suggestion
+
+# Found with a web search, which needs a strict schema: every field is required.
+class CourseSuggestion(BaseModel):
+    title: str                  # as the provider lists it
+    kind: Literal["course", "certification"]
+    provider: str               # e.g. Coursera, Microsoft Learn
+    cost: str                   # e.g. "Free", "Free to audit, $49 for the certificate"
+    url: str                    # the course's own page, from the search
+    why: str                    # one sentence: what it gives the candidate for this job
+    covers: list[str]           # gap ids
+    effort: Effort
+
+class CourseList(BaseModel):
+    courses: list[CourseSuggestion]
+
+class GapPlan(BaseModel):  # shown as "Suggestions"
+    project_add_ons: list[ProjectAddOn] = Field(default_factory=list)
+    new_projects: list[NewProjectIdea] = Field(default_factory=list)
+    courses: list[CourseSuggestion] = Field(default_factory=list)
 
 # --- CV generation --------------------------------------------------------------
 
@@ -184,7 +188,6 @@ class GeneratedCVContent(BaseModel):
     skills: list[str] = Field(default_factory=list)
     projects: list[GeneratedCVItem] = Field(default_factory=list)
     experience: list[GeneratedCVItem] = Field(default_factory=list)
-    courses: list[str] = Field(default_factory=list)  # course ids, most relevant first
 
 class FinalCVProject(BaseModel):
     id: str = ""            # profile id (proj_1), so a revision can find the item; never shown on the CV
@@ -209,6 +212,7 @@ class FinalCVEducation(BaseModel):
     expected_graduation: Optional[str] = None  # "06.2027" while ongoing
 
 class FinalCVCourse(BaseModel):
+    id: str = ""            # profile id (course_1), so a swap can find the item; never shown on the CV
     name: str
     provider: Optional[str] = None
     date: Optional[str] = None
@@ -239,6 +243,46 @@ class CVRevision(BaseModel):
     skills: Optional[list[str]] = Field(default=None, description="The full new skills list; null if unchanged")
     items: list[RevisedCVItem] = Field(
         default_factory=list, description="Only the projects and experience that change")
+    changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
+    not_done: list[str] = Field(
+        default_factory=list, description="Each part of the request that was not done, and why")
+
+# --- Swapping an item -------------------------------------------------------------
+# The user picks which profile item replaces which on the CV, and code swaps them
+# (nodes.swap_cv_item_node). The LLM only writes the new item's content, and fixes the
+# objective or skills when the swap leaves them out of step with the CV. null = unchanged.
+
+class CVSwap(BaseModel):
+    bullets: list[str] = Field(default_factory=list, description="3-5 tailored bullets for the new item")
+    tech_stack: list[str] = Field(
+        default_factory=list, description="A new project's 4-6 tools from its own text; empty for experience")
+    objective: Optional[str] = Field(default=None, description="The full new objective; null if unchanged")
+    skills: Optional[list[str]] = Field(default=None, description="The full new skills list; null if unchanged")
+    changes: list[str] = Field(
+        default_factory=list, description="One short line per change to the objective or skills, for the candidate")
+
+# --- Cover letter -----------------------------------------------------------------
+# The LLM writes only the body. Name, contact, date, company, greeting and sign-off come
+# from the profile and the JD in code, the same way the CV's names and dates do.
+
+class GeneratedCoverLetter(BaseModel):
+    paragraphs: list[str] = Field(
+        default_factory=list, description="The letter's body: 3-4 short paragraphs, without greeting or sign-off")
+
+class CoverLetter(BaseModel):
+    name: Optional[str] = None
+    contact: Optional[ContactInfo] = None
+    date: Optional[str] = None          # "6 October 2026", the day it was written
+    job_title: str = ""
+    company: Optional[str] = None
+    greeting: str = "Dear Hiring Manager,"
+    paragraphs: list[str] = Field(default_factory=list)
+    closing: str = "Best regards,"
+    source_ids: list[str] = Field(default_factory=list)  # the profile items it was written from; revisions keep to them
+
+class CoverLetterRevision(BaseModel):
+    paragraphs: Optional[list[str]] = Field(
+        default=None, description="The letter's full new body, every paragraph; null if unchanged")
     changes: list[str] = Field(default_factory=list, description="One short line per change made, for the candidate")
     not_done: list[str] = Field(
         default_factory=list, description="Each part of the request that was not done, and why")

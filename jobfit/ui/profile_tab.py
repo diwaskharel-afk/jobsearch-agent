@@ -20,27 +20,34 @@ from jobfit.ui.profile_fields import (
 )
 
 
+def kept(field: str) -> dict:
+    """Widget args that keep unsaved typing while the user is on another page."""
+    return {"key": f"profile_{field}", "persist_state": "session"}
+
+
 def render_profile_tab(existing: StructuredProfile | None) -> None:
     st.caption("Fill this out once; you can come back and edit it any time.")
 
     st.subheader("Basics")
-    name = st.text_input("Full name", value=(existing.name if existing else None) or "")
+    name = st.text_input("Full name", value=(existing.name if existing else None) or "", **kept("name"))
 
     st.subheader("Contact")
     contact = existing.contact if existing else None
-    address = st.text_input("Address", value=(contact.address if contact else None) or "")
-    phone = st.text_input("Phone", value=(contact.phone if contact else None) or "")
-    email = st.text_input("Email", value=(contact.email if contact else None) or "")
+    address = st.text_input("Address", value=(contact.address if contact else None) or "", **kept("address"))
+    phone = st.text_input("Phone", value=(contact.phone if contact else None) or "", **kept("phone"))
+    email = st.text_input("Email", value=(contact.email if contact else None) or "", **kept("email"))
 
     st.subheader("Skills & languages")
-    skills_raw = st.text_input("Skills (comma-separated)", value=", ".join(existing.skills) if existing else "")
-    languages_raw = st.text_input("Languages (comma-separated)", value=", ".join(existing.languages) if existing else "")
+    skills_raw = st.text_input("Skills (comma-separated)", value=", ".join(existing.skills) if existing else "",
+                               **kept("skills"))
+    languages_raw = st.text_input("Languages (comma-separated)",
+                                  value=", ".join(existing.languages) if existing else "", **kept("languages"))
 
     st.subheader("Links")
     links = existing.links if existing else {}
-    linkedin = st.text_input("LinkedIn URL", value=links.get("linkedin", ""))
-    github = st.text_input("GitHub URL", value=links.get("github", ""))
-    portfolio = st.text_input("Portfolio URL", value=links.get("portfolio", ""))
+    linkedin = st.text_input("LinkedIn URL", value=links.get("linkedin", ""), **kept("linkedin"))
+    github = st.text_input("GitHub URL", value=links.get("github", ""), **kept("github"))
+    portfolio = st.text_input("Portfolio URL", value=links.get("portfolio", ""), **kept("portfolio"))
 
     st.subheader("Education")
     st.caption("Always included on every CV, newest first.")

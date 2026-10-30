@@ -1,0 +1,6 @@
+# The app's accent matches the CV and cover letter PDFs.
+[theme.light]
+primaryColor = "#1D4E89"
+
+[theme.dark]
+primaryColor = "#6EA8FE"

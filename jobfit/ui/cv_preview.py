@@ -1,5 +1,6 @@
 """On-screen preview of a CV, optionally with its editable text as boxes."""
 import re
+from typing import Callable
 
 import streamlit as st
 
@@ -17,9 +18,15 @@ def preview_section(title: str) -> None:
 
 
 def preview_entry(title: str, date: str | None, subtitle: str | None, bullets: list[str],
-                  description: str | None = None) -> None:
-    """Title with its date on the right, then an italic subtitle, a description and bullets."""
-    title_col, date_col = st.columns([3, 1])
+                  description: str | None = None, action: Callable[[], None] | None = None) -> None:
+    """Title with its date on the right, then an italic subtitle, a description and bullets.
+    action draws a small control (the swap menu) at the far right of the title row."""
+    if action:
+        title_col, date_col, action_col = st.columns([12, 4, 1])
+        with action_col:
+            action()
+    else:
+        title_col, date_col = st.columns([3, 1])
     title_col.markdown(f"**{title}**" + (f"  \n*{subtitle}*" if subtitle else ""))
     if _date(date):
         date_col.caption(md(_date(date)), text_alignment="right")
@@ -29,11 +36,18 @@ def preview_entry(title: str, date: str | None, subtitle: str | None, bullets: l
         st.markdown("\n".join(f"- {md(b)}" for b in bullets))
 
 
-def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0) -> CVRevision | None:
+def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0,
+                      swap_menu: Callable[[str], None] | None = None) -> CVRevision | None:
     """With edit, the text a revision can change (objective, skills, bullets, tech stacks) becomes
     boxes in its place, and the edits come back as a CVRevision; call it inside a form. Keys carry
-    the version, so the boxes refill after an AI revision or an Undo."""
+    the version, so the boxes refill after an AI revision or an Undo.
+    swap_menu(item_id) draws the swap control next to each project, experience and course."""
     items = []
+
+    def swap_action(entry) -> Callable[[], None] | None:
+        if swap_menu is None or not entry.id:  # items without an id can't be swapped
+            return None
+        return lambda: swap_menu(entry.id)
     with st.container(border=not edit):
         if _clean(cv.name):
             st.markdown(f"## {md(cv.name)}", anchors=False)
@@ -75,7 +89,8 @@ def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0) -> CVRe
         if cv.experience:
             preview_section("Experience")
             for exp in cv.experience:
-                preview_entry(md(exp.title), exp.duration, md(exp.organization) or None, [] if edit else exp.bullets)
+                preview_entry(md(exp.title), exp.duration, md(exp.organization) or None, [] if edit else exp.bullets,
+                              action=swap_action(exp))
                 if edit:
                     edit_boxes(exp, False)
 
@@ -91,7 +106,8 @@ def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0) -> CVRe
                     edit_boxes(project, True)
                 else:
                     tech = [md(t) for t in project.tech_stack if _clean(t)][:MAX_TECH_SHOWN]
-                    preview_entry(title, None, " · ".join(tech) or None, project.bullets)
+                    preview_entry(title, None, " · ".join(tech) or None, project.bullets,
+                                  action=swap_action(project))
 
         if cv.education:
             preview_section("Education")
@@ -110,8 +126,15 @@ def render_cv_preview(cv: FinalCV, edit: bool = False, version: int = 0) -> CVRe
                     line += f" — {md(course.provider)}"
                 if _clean(course.date):
                     line += f" ({md(course.date)})"
-                course_lines.append(line)
-            st.markdown("\n".join(course_lines))
+                if action := swap_action(course):  # its own row, with the swap menu on the right
+                    line_col, action_col = st.columns([16, 1])
+                    line_col.markdown(line)
+                    with action_col:
+                        action()
+                else:
+                    course_lines.append(line)
+            if course_lines:
+                st.markdown("\n".join(course_lines))
     if edit:
         return CVRevision(objective=objective, skills=lines(skills), items=items)
     return None

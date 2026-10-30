@@ -27,10 +27,11 @@ def month_year_picker(label: str, value: str | None, key: str, years: list[int],
         years = sorted({*years, year}, reverse=years[0] > years[-1])
     month_col, year_col = cols or st.columns(4)[:2]
     month = month_col.selectbox(label, range(1, 13), index=month - 1 if month else None,
-                                format_func=lambda m: MONTH_NAMES[m - 1], placeholder="Month", key=f"{key}_month")
+                                format_func=lambda m: MONTH_NAMES[m - 1], placeholder="Month", key=f"{key}_month",
+                                persist_state="session")
     # A short hidden label: a long one still wraps invisibly and pushes the row down.
     year = year_col.selectbox("Year", years, index=years.index(year) if year else None,
-                              placeholder="Year", label_visibility="hidden", key=f"{key}_year")
+                              placeholder="Year", label_visibility="hidden", key=f"{key}_year", persist_state="session")
     if month is None and year is None:
         return None
     return f"{year or ''}-{month:02d}" if month else f"{year}-"
@@ -42,7 +43,8 @@ def date_range_fields(entry: dict, key, present_label: str, expected_graduation:
     While present is on, the To slot shows "Present", or for education (expected_graduation=True)
     the expected graduation pickers, which are then required.
     """
-    present = st.toggle(present_label, value=bool(entry.get("start")) and not entry.get("end"), key=key("present"))
+    present = st.toggle(present_label, value=bool(entry.get("start")) and not entry.get("end"), key=key("present"),
+                        persist_state="session")
     cols = st.columns(4, vertical_alignment="bottom")
     values = {"start": month_year_picker("From", entry.get("start"), key("start"), PAST_YEARS, cols[:2]),
               "end": None, "present": present}
